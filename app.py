@@ -256,26 +256,24 @@ def render_chart(df, symbol, expiry_str):
 
     fig = go.Figure()
 
-    # 1. Position Builder Histogram Trace (Assigned to Y2 Axis - Bottom Floor)
+    # 1. Position Builder Histogram Trace (Y2 Axis - Bottom Floor)
     values = df["position_builder_scaled"].fillna(0)
     colors = ["#089981" if v >= 0 else "#f23645" for v in values]
-    formatted_times = df["timestamp"].dt.strftime("%B %d, %Y at %I:%M %p")
 
     fig.add_trace(
         go.Bar(
             x=df["timestamp"],
             y=values,
-            customdata=formatted_times,
             name="Net OI Scaled",
             marker_color=colors,
             marker_line_width=0,
             opacity=0.8,
             yaxis="y2",
-            hovertemplate="%{customdata}<extra></extra>",
+            hoverinfo="none",  # Disables floating tooltip popups
         )
     )
 
-    # 2. Candlestick Price Trace (Assigned to Y1 Axis - Top Section)
+    # 2. Candlestick Price Trace (Y1 Axis - Top Section)
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -290,7 +288,7 @@ def render_chart(df, symbol, expiry_str):
             decreasing_line_color="#f23645",
             whiskerwidth=0.4,
             yaxis="y1",
-            hoverinfo="none",
+            hoverinfo="none",  # Disables floating tooltip popups
         )
     )
 
@@ -304,16 +302,17 @@ def render_chart(df, symbol, expiry_str):
         template="plotly_dark",
         paper_bgcolor="#131722",
         plot_bgcolor="#131722",
-        height=420,
+        height=620,
         margin=dict(l=20, r=20, t=45, b=20),
         showlegend=False,
         hovermode="x",
         dragmode="pan",
-        # Shared X-Axis with Crosshair Line
+        # X-Axis settings - Timestamps forced to the bottom
         xaxis=dict(
             type="date",
+            side="bottom",  # Positions time labels at the bottom of the chart
             showspikes=True,
-            spikemode="across",
+            spikemode="across+toaxis",
             spikesnap="cursor",
             spikecolor="#ffffff",
             spikethickness=1,
@@ -322,11 +321,11 @@ def render_chart(df, symbol, expiry_str):
             rangebreaks=[dict(bounds=["sat", "mon"])],
             rangeslider=dict(visible=False),
         ),
-        # Primary Price Y-Axis (Top 75% Domain - Auto-scaling Enabled)
+        # Primary Price Y-Axis (Top 75%)
         yaxis=dict(
             title="Price",
-            domain=[0.25, 1.0],  # Keeps candles in top 75%
-            autorange=True,      # Enables smooth dynamic scaling on zoom
+            domain=[0.25, 1.0],
+            autorange=True,
             showspikes=True,
             spikemode="across",
             spikesnap="cursor",
@@ -336,10 +335,10 @@ def render_chart(df, symbol, expiry_str):
             gridcolor="#2a2e39",
             side="right",
         ),
-        # Secondary Histogram Y-Axis (Bottom 22% Domain)
+        # Secondary Histogram Y-Axis (Bottom 22%)
         yaxis2=dict(
             title="",
-            domain=[0.0, 0.22],  # Locks histogram to bottom 22%
+            domain=[0.0, 0.22],
             side="right",
             showgrid=False,
             showticklabels=False,
