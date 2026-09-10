@@ -248,7 +248,7 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# FULL-CANVAS SINGLE CONTINUOUS CROSSHAIR RENDERER
+# CHART RENDERER (FULL CROSSHAIR + NO OHLC HOVER BOX)
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
@@ -266,7 +266,7 @@ def render_chart(df, symbol, expiry_str):
         ),
     )
 
-    # 1. Candlestick Trace
+    # 1. Candlestick Trace (Hover info disabled completely)
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -280,13 +280,13 @@ def render_chart(df, symbol, expiry_str):
             decreasing_fillcolor="#f23645",
             decreasing_line_color="#f23645",
             whiskerwidth=0.4,
-            hoverinfo="x+y+name",
+            hoverinfo="none",
         ),
         row=1,
         col=1,
     )
 
-    # 2. Position Builder Histogram Trace
+    # 2. Position Builder Histogram Trace (Hover info disabled completely)
     values = df["position_builder_scaled"].fillna(0)
     colors = ["#089981" if v >= 0 else "#f23645" for v in values]
 
@@ -297,23 +297,10 @@ def render_chart(df, symbol, expiry_str):
             name="Net OI Scaled",
             marker_color=colors,
             marker_line_width=0,
-            hovertemplate="OI Scaled: %{y:.2f}<extra></extra>",
+            hoverinfo="none",
         ),
         row=2,
         col=1,
-    )
-
-    # 3. Full Canvas Vertical Crosshair overlay trace (spans y=0 to y=1 across all rows)
-    fig.add_trace(
-        go.Scatter(
-            x=df["timestamp"],
-            y=[0.5] * len(df),
-            mode="lines",
-            line=dict(width=0, color="rgba(0,0,0,0)"),
-            hoverinfo="none",
-            showlegend=False,
-            yaxis="y3",
-        )
     )
 
     fig.update_layout(
@@ -323,34 +310,29 @@ def render_chart(df, symbol, expiry_str):
         height=530,
         margin=dict(l=20, r=20, t=35, b=20),
         showlegend=False,
-        hovermode="x unified",
+        hovermode=False,  # Completely removes hover tooltips/OHLC boxes
         dragmode="pan",
         xaxis_rangeslider_visible=False,
-        # Secondary Y-Axis spanning entire canvas domain for uninterrupted vertical spike
-        yaxis3=dict(
-            overlaying="y",
-            visible=False,
-            range=[0, 1],
-            showspikes=True,
-            spikemode="across",
-            spikecolor="#cccccc",
-            spikethickness=1,
-            spikedash="dash",
-        )
     )
 
-    # Disable row-level x-spikes to avoid broken segmented lines
+    # Full vertical crosshair spanning continuously across entire chart
     fig.update_xaxes(
-        showspikes=False,
+        showspikes=True,
+        spikemode="across",
+        spikesnap="cursor",
+        spikecolor="#ffffff",
+        spikethickness=1,
+        spikedash="dash",
         gridcolor="#2a2e39",
         rangebreaks=[dict(bounds=["sat", "mon"])],
     )
 
-    # Horizontal Crosshair on Price Subplot
+    # Horizontal Crosshair - Price Subplot
     fig.update_yaxes(
         showspikes=True,
         spikemode="across",
-        spikecolor="#cccccc",
+        spikesnap="cursor",
+        spikecolor="#ffffff",
         spikethickness=1,
         spikedash="dash",
         gridcolor="#2a2e39",
@@ -359,11 +341,12 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
-    # Horizontal Crosshair on Histogram Subplot
+    # Horizontal Crosshair - Histogram Subplot
     fig.update_yaxes(
         showspikes=True,
         spikemode="across",
-        spikecolor="#cccccc",
+        spikesnap="cursor",
+        spikecolor="#ffffff",
         spikethickness=1,
         spikedash="dash",
         range=[-110, 110],
