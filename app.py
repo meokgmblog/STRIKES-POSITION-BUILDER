@@ -254,38 +254,19 @@ def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
     last_time = df["timestamp"].iloc[-1].strftime("%H:%M:%S")
 
-    # Calculate price extremes to keep candles in top ~75% of canvas
-    price_min = df["low"].min()
-    price_max = df["high"].max()
-    price_span = price_max - price_min if price_max != price_min else 1.0
-
-    y1_min = price_min - (price_span * 0.35)
-    y1_max = price_max + (price_span * 0.05)
-
-    fig = go.Figure()
-
-    # 1. Position Builder Histogram Trace (Y2 Axis - Shifted to Bottom)
-    values = df["position_builder_scaled"].fillna(0)
-    colors = ["#089981" if v >= 0 else "#f23645" for v in values]
-
-    # Custom date-time string formatting for the tooltip
-    formatted_times = df["timestamp"].dt.strftime("%B %d, %Y at %I:%M %p")
-
-    fig.add_trace(
-        go.Bar(
-            x=df["timestamp"],
-            y=values,
-            customdata=formatted_times,
-            name="Net OI Scaled",
-            marker_color=colors,
-            marker_line_width=0,
-            opacity=0.8,
-            yaxis="y2",
-            hovertemplate="%{customdata}<extra></extra>",  # Shows ONLY the Date and Time
-        )
+    # 1. Create two physically separated subpanels with 0 vertical spacing
+    fig = make_subplots(
+        rows=2,
+        cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.01,
+        row_heights=[0.75, 0.25],
     )
 
-    # 2. Candlestick Price Trace (Y1 Axis) - Disabled Hover Info
+    # Custom date-time string formatting for tooltips
+    formatted_times = df["timestamp"].dt.strftime("%B %d, %Y at %I:%M %p")
+
+    # 2. Candlestick Trace (Top Panel - Row 1)
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -299,9 +280,84 @@ def render_chart(df, symbol, expiry_str):
             decreasing_fillcolor="#f23645",
             decreasing_line_color="#f23645",
             whiskerwidth=0.4,
-            yaxis="y1",
-            hoverinfo="none",  # Hides candlestick OHLC values from tooltip
-        )
+            hoverinfo="none",  # Suppresses candle OHLC hover box
+        ),
+        row=1,
+        col=1,
+    )
+
+    # 3. Position Builder Histogram Trace (Bottom Panel - Row 2)
+    values = df["position_builder_scaled"].fillna(0)
+    colors = ["#089981" if v >= 0 else "#f23645" for v in values]
+
+    fig.add_trace(
+        go.Bar(
+            x=df["timestamp"],
+            y=values,
+            customdata=formatted_times,
+            name="Net OI Scaled",
+            marker_color=colors,
+            marker_line_width=0,
+            opacity=0.8,
+            hovertemplate="%{customdata}<extra></extra>",  # Displays ONLY Date and Time
+        ),
+        row=2,
+        col=1,
+    )
+
+    # Unified crosshair spike settings
+    spike_config = dict(
+        showspikes=True,
+        spikemode="across+toaxis",
+        spikesnap="cursor",
+        spikecolor="#ffffff",
+        spikethickness=1,
+        spikedash="dash",
+        gridcolor="#2a2e39",
+    )
+
+    # Configure Top X-Axis
+    fig.update_xaxes(
+        **spike_config,
+        rangebreaks=[dict(bounds=["sat", "mon"])],
+        rangeslider=dict(visible=False),
+        matches="x",
+        row=1,
+        col=1,
+    )
+
+    # Configure Bottom X-Axis
+    fig.update_xaxes(
+        **spike_config,
+        rangebreaks=[dict(bounds=["sat", "mon"])],
+        row=2,
+        col=1,
+    )
+
+    # Configure Price Y-Axis (Top Panel)
+    fig.update_yaxes(
+        **spike_config,
+        side="right",
+        title="Price",
+        zerolinecolor="#363a45",
+        row=1,
+        col=1,
+    )
+
+    # Configure Histogram Y-Axis (Bottom Panel)
+    # fixedrange=True locks vertical scaling during zooming/panning/autoscale
+    fig.update_yaxes(
+        showspikes=False,
+        side="right",
+        range=[-105, 105],
+        fixedrange=True,  # Keeps bars bounded during zoom and autoscale
+        showgrid=False,
+        showticklabels=False,
+        zeroline=True,
+        zerolinecolor="#363a45",
+        zerolinewidth=1,
+        row=2,
+        col=1,
     )
 
     fig.update_layout(
@@ -317,46 +373,8 @@ def render_chart(df, symbol, expiry_str):
         height=620,
         margin=dict(l=20, r=20, t=45, b=20),
         showlegend=False,
-        hovermode="x",
+        hovermode="x unified",
         dragmode="pan",
-        # Unified X-Axis (Crosshair Line)
-        xaxis=dict(
-            type="date",
-            showspikes=True,
-            spikemode="across",
-            spikesnap="cursor",
-            spikecolor="#ffffff",
-            spikethickness=1,
-            spikedash="dash",
-            gridcolor="#2a2e39",
-            rangebreaks=[dict(bounds=["sat", "mon"])],
-            rangeslider=dict(visible=False),
-        ),
-        # Primary Y-Axis (Candlesticks Upper Canvas)
-        yaxis=dict(
-            title="Price",
-            range=[y1_min, y1_max],
-            showspikes=True,
-            spikemode="across",
-            spikesnap="cursor",
-            spikecolor="#ffffff",
-            spikethickness=1,
-            spikedash="dash",
-            gridcolor="#2a2e39",
-            side="right",
-        ),
-        # Secondary Y-Axis (Histogram Floor)
-        yaxis2=dict(
-            title="",
-            overlaying="y",
-            side="left",
-            range=[-110, 480],
-            showgrid=False,
-            showticklabels=False,
-            zeroline=True,
-            zerolinecolor="#363a45",
-            zerolinewidth=1,
-        ),
     )
 
     config = {
