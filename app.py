@@ -248,7 +248,7 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# CHART RENDERER (TRADINGVIEW-STYLE FULL CROSSHAIR)
+# CHART RENDERER (TRADINGVIEW-STYLE NATIVE CROSSHAIR)
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
@@ -258,15 +258,15 @@ def render_chart(df, symbol, expiry_str):
         rows=2,
         cols=1,
         shared_xaxes=True,
-        vertical_spacing=0.03,
-        row_heights=[0.58, 0.42],
+        vertical_spacing=0.02,
+        row_heights=[0.60, 0.40],
         subplot_titles=(
             f"{symbol} Spot | 3m | Last: {last_price:.2f} | Updated: {last_time} IST",
             f"POSITION BUILDER HISTOGRAM ({expiry_str})",
         ),
     )
 
-    # Candlestick Trace (hoverinfo="none" disables OHLC box completely)
+    # 1. Candlestick Trace (hovertemplate empty removes OHLC info card completely)
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -280,13 +280,13 @@ def render_chart(df, symbol, expiry_str):
             decreasing_fillcolor="#f23645",
             decreasing_line_color="#f23645",
             whiskerwidth=0.4,
-            hoverinfo="none",
+            hovertemplate="",
         ),
         row=1,
         col=1,
     )
 
-    # Position Builder Histogram Trace
+    # 2. Position Builder Histogram Trace
     values = df["position_builder_scaled"].fillna(0)
     colors = ["#089981" if v >= 0 else "#f23645" for v in values]
 
@@ -297,29 +297,51 @@ def render_chart(df, symbol, expiry_str):
             name="Net OI Scaled",
             marker_color=colors,
             marker_line_width=0,
-            hoverinfo="none",
+            hovertemplate="",
         ),
         row=2,
         col=1,
     )
 
-    # Synchronize X axes across both panels
+    # Enable native spikes on both x-axes with cursor snapping
     fig.update_xaxes(
+        showspikes=True,
+        spikemode="across",
+        spikesnap="cursor",
+        spikecolor="#ffffff",
+        spikethickness=1,
+        spikedash="dash",
         gridcolor="#2a2e39",
         rangebreaks=[dict(bounds=["sat", "mon"])],
+    )
+
+    # Enable horizontal spikes on both y-axes
+    fig.update_yaxes(
+        showspikes=True,
+        spikemode="across",
+        spikesnap="cursor",
+        spikecolor="#ffffff",
+        spikethickness=1,
+        spikedash="dash",
+        gridcolor="#2a2e39",
+        zerolinecolor="#363a45",
         row=1,
         col=1,
     )
-    fig.update_xaxes(
+
+    fig.update_yaxes(
+        showspikes=True,
+        spikemode="across",
+        spikesnap="cursor",
+        spikecolor="#ffffff",
+        spikethickness=1,
+        spikedash="dash",
+        range=[-110, 110],
         gridcolor="#2a2e39",
-        rangebreaks=[dict(bounds=["sat", "mon"])],
-        matches="x",
+        zerolinecolor="#363a45",
         row=2,
         col=1,
     )
-
-    fig.update_yaxes(gridcolor="#2a2e39", zerolinecolor="#363a45", row=1, col=1)
-    fig.update_yaxes(gridcolor="#2a2e39", zerolinecolor="#363a45", range=[-110, 110], row=2, col=1)
 
     fig.update_layout(
         template="plotly_dark",
@@ -328,7 +350,9 @@ def render_chart(df, symbol, expiry_str):
         height=530,
         margin=dict(l=20, r=20, t=35, b=20),
         showlegend=False,
-        hovermode=False,
+        hovermode="x",
+        hoverdistance=100,
+        spikedistance=1000,
         dragmode="pan",
         xaxis_rangeslider_visible=False,
     )
@@ -341,63 +365,6 @@ def render_chart(df, symbol, expiry_str):
     }
 
     st.plotly_chart(fig, use_container_width=True, config=config)
-
-    # Inject DOM Crosshair Script for TradingView Full-Canvas Crosshair Lines
-    components.html(
-        """
-        <script>
-        (function attachCrosshair() {
-            const parentDoc = window.parent.document;
-            const container = parentDoc.querySelector('.stPlotlyChart');
-            if (!container) {
-                setTimeout(attachCrosshair, 300);
-                return;
-            }
-
-            let vLine = parentDoc.getElementById('tv-crosshair-v');
-            let hLine = parentDoc.getElementById('tv-crosshair-h');
-
-            if (!vLine) {
-                vLine = parentDoc.createElement('div');
-                vLine.id = 'tv-crosshair-v';
-                vLine.style.cssText = 'position:absolute;top:0;bottom:0;width:1px;border-left:1px dashed #ffffff;pointer-events:none;z-index:9999;display:none;';
-                container.style.position = 'relative';
-                container.appendChild(vLine);
-            }
-
-            if (!hLine) {
-                hLine = parentDoc.createElement('div');
-                hLine.id = 'tv-crosshair-h';
-                hLine.style.cssText = 'position:absolute;left:0;right:0;height:1px;border-top:1px dashed #ffffff;pointer-events:none;z-index:9999;display:none;';
-                container.style.position = 'relative';
-                container.appendChild(hLine);
-            }
-
-            container.addEventListener('mousemove', (e) => {
-                const rect = container.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-
-                if (x >= 0 && x <= rect.width && y >= 0 && y <= rect.height) {
-                    vLine.style.left = x + 'px';
-                    vLine.style.display = 'block';
-                    hLine.style.top = y + 'px';
-                    hLine.style.display = 'block';
-                } else {
-                    vLine.style.display = 'none';
-                    hLine.style.display = 'none';
-                }
-            });
-
-            container.addEventListener('mouseleave', () => {
-                vLine.style.display = 'none';
-                hLine.style.display = 'none';
-            });
-        })();
-        </script>
-        """,
-        height=0,
-    )
 
 # ================================================================
 # MAIN EXECUTION ENGINE
