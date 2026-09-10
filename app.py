@@ -248,7 +248,7 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# CHART RENDERER (FULL CANVAS CROSSHAIR + NO HOVER BOX)
+# CHART RENDERER
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
@@ -266,7 +266,7 @@ def render_chart(df, symbol, expiry_str):
         ),
     )
 
-    # 1. Candlestick Trace (Empty hovertemplate disables OHLC box)
+    # 1. Candlestick Trace
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -303,10 +303,10 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
-    # Spike lines enabled across both subplots
+    # Corrected spikemode configuration
     fig.update_xaxes(
         showspikes=True,
-        spikemode="across+both",
+        spikemode="across+marker",
         spikesnap="cursor",
         spikecolor="#ffffff",
         spikethickness=1,
