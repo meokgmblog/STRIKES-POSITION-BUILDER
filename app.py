@@ -26,52 +26,44 @@ INTERVAL = 3
 # Hardcoded Access Token (hidden from UI)
 ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI6M0FZSEUiLCJqdGkiOiI6YThkNTc1Y2Y4MTJmNjA0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU"
 
-MAJOR_INDICES = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50"]
+# Complete master list of all F&O stocks, sectors, and indices from Excel
+FNO_MASTER_LIST = [
+    "360ONE", "ABB", "ABCAPITAL", "ADANIENSOL", "ADANIENT", "ADANIGREEN", "ADANIPORTS", "ADANIPOWER", 
+    "ALKEM", "AMBER", "AMBUJACEM", "ANGELONE", "APLAPOLLO", "APOLLOHOSP", "ASHOKLEY", "ASIANPAINT", 
+    "ASTRAL", "AUBANK", "AUROPHARMA", "AUTO", "AXISBANK", "BANK", "BANKBARODA", "BANKNIFTY", 
+    "BBDOWN", "BEL", "BHARATFORG", "BHARTIARTL", "BHEL", "BIOCON", "BOSCHLTD", "BPCL", "BRITANNIA", 
+    "BSOFT", "CANBK", "CANFINHOME", "CDSL", "CEMENT", "CGPOWER", "CHAMBLFERT", "CHOLAFIN", "CIPLA", 
+    "COALINDIA", "COFORGE", "COLPAL", "CONCOR", "COROMANDEL", "CROMPTON", "CUMMINSIND", "CYIENT", 
+    "DABUR", "DALBHARAT", "DEEPAKNTR", "DELHIVERY", "DIVISLAB", "DIXON", "DLF", "DMART", "DRREDDY", 
+    "EICHERMOT", "ENERGY", "ESCORTS", "ETFLONG", "EXIDEIND", "FEDERALBNK", "FINNIFTY", "FIN SERVICE", 
+    "FMCG", "FORTIS", "GAIL", "GLENMARK", "GMRAIRPORT", "GNFC", "GODREJPROP", "GRANULES", "GRASIM", 
+    "GUJGASLTD", "HAL", "HAVELLS", "HCLTECH", "HDFCAMC", "HDFCBANK", "HDFCLIFE", "HEROMOTOCO", 
+    "HFCL", "HINDALCO", "HAL", "HINDCOPPER", "HINDPETRO", "HINDUNILVR", "HUDCO", "ICICIBANK", 
+    "ICICIGI", "ICICIPRULI", "IDEA", "IDFCFIRSTB", "IEX", "IGL", "INDHOTEL", "INDIAMART", 
+    "INDIANB", "INDIGO", "INDUSINDBK", "INDUSTOWER", "INFY", "INOXWIND", "IOC", "IPCALAB", 
+    "IRCTC", "IREDA", "IRFC", "IT", "ITC", "JINDALSTEL", "JIOFIN", "JSWENERGY", "JSWSTEEL", 
+    "JUBLFOOD", "KALYANKJIL", "KEI", "KEI", "KPITTECH", "KPRMILL", "LALPATHLAB", "LAURUSLABS", 
+    "LICHSGFIN", "LICI", "LODHA", "LT", "LTF", "LTIM", "LTTS", "LUPIN", "M&M", "M&MFIN", 
+    "MANAPPURAM", "MARICO", "MARUTI", "MAXHEALTH", "MCX", "METAL", "METROPOLIS", "MFSL", "MGFL", 
+    "MIDCPNIFTY", "MOTHERSON", "MPHASIS", "MRF", "MUTHOOTFIN", "NATIONALUM", "NAUKRI", "NAVINFLUOR", 
+    "NCC", "NESTLEIND", "NHPC", "NIFTY", "NIFTY MID SELECT", "NIFTY50", "NIFTYNXT50", "NMDC", 
+    "NTPC", "NYKAA", "OBEROIRLTY", "OFSS", "OIL", "ONGC", "PAGEIND", "PERSISTENT", "PETRONET", 
+    "PFC", "PHARMA", "PIDILITIND", "PIIND", "PNB", "POLYCAB", "POONAWALLA", "POWERGRID", "PRESTIGE", 
+    "PSU BANK", "PVT BANK", "RAILTEL", "RAMCOCEM", "RBLBANK", "RECLTD", "REALTY", "RELIANCE", 
+    "RVNL", "SAIL", "SBICARD", "SBILIFE", "SBIN", "SENSEX", "SHREECEM", "SHRIRAMFIN", "SIEMENS", 
+    "SJVN", "SOLARINDS", "SONACOMS", "SRF", "SUZLON", "SYNGENE", "TATACHEM", "TATACOMM", "TATACONSUM", 
+    "TATAELEXSI", "TATAMOTORS", "TATAPOWER", "TATASTEEL", "TCS", "TECHM", "TIINDIA", "TITAN", 
+    "TORNTPHARM", "TORNTPOWER", "TRENT", "TVSMOTOR", "UBL", "ULTRACEMCO", "UNIONBANK", "UNITDSPR", 
+    "UNOMINDA", "UPL", "VBL", "VEDL", "VOLTAS", "WIPRO", "YESBANK", "ZYDUSLIFE"
+]
 
-@st.cache_data(ttl=3600)
-def load_fno_symbols():
-    """
-    Reads symbol names and sector names from FNO all list.xlsx.
-    Tries loading from GitHub raw link first, then falls back to local file.
-    """
-    symbols = []
-    github_raw_url = "https://raw.githubusercontent.com/meokgmblog/STRIKES-POSITION-BUILDER/main/FNO%20all%20list.xlsx"
-    
-    df = None
-    # 1. Try fetching directly from GitHub raw URL
-    try:
-        res = requests.get(github_raw_url, timeout=10)
-        if res.status_code == 200:
-            df = pd.read_excel(io.BytesIO(res.content))
-    except Exception:
-        df = None
-
-    # 2. Fallback to local file if GitHub network fetch fails
-    if df is None:
-        try:
-            df = pd.read_excel("FNO all list.xlsx")
-        except Exception:
-            df = None
-
-    if df is not None:
-        if "SYMBOL" in df.columns:
-            syms = df["SYMBOL"].dropna().astype(str).str.strip().str.upper().tolist()
-            symbols.extend(syms)
-        if "SECTOR" in df.columns:
-            sectors = df["SECTOR"].dropna().astype(str).str.strip().str.upper().unique().tolist()
-            symbols.extend(sectors)
-
-    # Clean up and deduplicate list
-    all_symbols = sorted(list(set(MAJOR_INDICES + symbols)))
-    return all_symbols
-
-fno_symbol_list = load_fno_symbols()
+fno_symbol_list = sorted(list(set(FNO_MASTER_LIST)))
 
 # Sidebar Controls
 st.sidebar.title("⚙️ Controls & Parameters")
 
-# Searchable Dropdown for F&O Symbols (Includes Stocks, Sectors, and Indices)
-default_index = fno_symbol_list.index("LAURUSLABS") if "LAURUSLABS" in fno_symbol_list else 0
+# Searchable Dropdown for F&O Symbols (Default: NIFTY)
+default_index = fno_symbol_list.index("NIFTY") if "NIFTY" in fno_symbol_list else 0
 SYMBOL_INPUT = st.sidebar.selectbox(
     "F&O Symbol",
     options=fno_symbol_list,
