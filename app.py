@@ -248,7 +248,7 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# CHART RENDERER
+# CHART RENDERER WITH FULL CANVAS CROSSHAIR OVERLAY
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
@@ -266,7 +266,7 @@ def render_chart(df, symbol, expiry_str):
         ),
     )
 
-    # 1. Candlestick Trace
+    # 1. Candlestick Trace (hoverinfo="none" suppresses native OHLC tooltips)
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -280,7 +280,7 @@ def render_chart(df, symbol, expiry_str):
             decreasing_fillcolor="#f23645",
             decreasing_line_color="#f23645",
             whiskerwidth=0.4,
-            hovertemplate="<extra></extra>",
+            hoverinfo="none",
         ),
         row=1,
         col=1,
@@ -297,20 +297,13 @@ def render_chart(df, symbol, expiry_str):
             name="Net OI Scaled",
             marker_color=colors,
             marker_line_width=0,
-            hovertemplate="<extra></extra>",
+            hoverinfo="none",
         ),
         row=2,
         col=1,
     )
 
-    # Corrected spikemode configuration
     fig.update_xaxes(
-        showspikes=True,
-        spikemode="across+marker",
-        spikesnap="cursor",
-        spikecolor="#ffffff",
-        spikethickness=1,
-        spikedash="dash",
         gridcolor="#2a2e39",
         rangebreaks=[dict(bounds=["sat", "mon"])],
     )
@@ -318,12 +311,6 @@ def render_chart(df, symbol, expiry_str):
     fig.update_xaxes(matches="x", row=2, col=1)
 
     fig.update_yaxes(
-        showspikes=True,
-        spikemode="across",
-        spikesnap="cursor",
-        spikecolor="#ffffff",
-        spikethickness=1,
-        spikedash="dash",
         gridcolor="#2a2e39",
         zerolinecolor="#363a45",
         row=1,
@@ -331,12 +318,6 @@ def render_chart(df, symbol, expiry_str):
     )
 
     fig.update_yaxes(
-        showspikes=True,
-        spikemode="across",
-        spikesnap="cursor",
-        spikecolor="#ffffff",
-        spikethickness=1,
-        spikedash="dash",
         range=[-110, 110],
         gridcolor="#2a2e39",
         zerolinecolor="#363a45",
@@ -351,8 +332,7 @@ def render_chart(df, symbol, expiry_str):
         height=530,
         margin=dict(l=20, r=20, t=35, b=20),
         showlegend=False,
-        hovermode="x unified",
-        hoverlabel=dict(bgcolor="rgba(0,0,0,0)", bordercolor="rgba(0,0,0,0)", font_size=1),
+        hovermode=False,
         dragmode="pan",
         xaxis_rangeslider_visible=False,
     )
@@ -365,6 +345,80 @@ def render_chart(df, symbol, expiry_str):
     }
 
     st.plotly_chart(fig, use_container_width=True, config=config)
+
+    # Full DOM Crosshair Overlay script
+    components.html(
+        """
+        <script>
+        (function() {
+            function attachCrosshair() {
+                const parentDoc = window.parent.document;
+                const plotContainer = parentDoc.querySelector('.stPlotlyChart');
+                if (!plotContainer) {
+                    setTimeout(attachCrosshair, 300);
+                    return;
+                }
+
+                // Remove existing crosshair element if present
+                let existingV = parentDoc.getElementById('custom-v-crosshair');
+                let existingH = parentDoc.getElementById('custom-h-crosshair');
+                if (existingV) existingV.remove();
+                if (existingH) existingH.remove();
+
+                const vLine = parentDoc.createElement('div');
+                vLine.id = 'custom-v-crosshair';
+                vLine.style.position = 'absolute';
+                vLine.style.top = '0px';
+                vLine.style.bottom = '0px';
+                vLine.style.width = '1px';
+                vLine.style.borderLeft = '1px dashed #ffffff';
+                vLine.style.pointerEvents = 'none';
+                vLine.style.zIndex = '9999';
+                vLine.style.display = 'none';
+
+                const hLine = parentDoc.createElement('div');
+                hLine.id = 'custom-h-crosshair';
+                hLine.style.position = 'absolute';
+                hLine.style.left = '0px';
+                hLine.style.right = '0px';
+                hLine.style.height = '1px';
+                hLine.style.borderTop = '1px dashed #ffffff';
+                hLine.style.pointerEvents = 'none';
+                hLine.style.zIndex = '9999';
+                hLine.style.display = 'none';
+
+                plotContainer.style.position = 'relative';
+                plotContainer.appendChild(vLine);
+                plotContainer.appendChild(hLine);
+
+                plotContainer.addEventListener('mousemove', function(e) {
+                    const rect = plotContainer.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+
+                    if (x >= 0 && x <= rect.width && y >= 0 && y <= rect.height) {
+                        vLine.style.left = x + 'px';
+                        vLine.style.display = 'block';
+                        hLine.style.top = y + 'px';
+                        hLine.style.display = 'block';
+                    } else {
+                        vLine.style.display = 'none';
+                        hLine.style.display = 'none';
+                    }
+                });
+
+                plotContainer.addEventListener('mouseleave', function() {
+                    vLine.style.display = 'none';
+                    hLine.style.display = 'none';
+                });
+            }
+
+            setTimeout(attachCrosshair, 500);
+        })();
+        </script>
+        """,
+        height=0,
+    )
 
 # ================================================================
 # MAIN EXECUTION ENGINE
