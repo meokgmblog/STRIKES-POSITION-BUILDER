@@ -248,7 +248,7 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# CHART RENDERER (FULL CROSSHAIR + NO OHLC HOVER BOX)
+# CHART RENDERER (FULL CROSSHAIR + NO HOVER BOX + SYNCED AXES)
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
@@ -266,7 +266,7 @@ def render_chart(df, symbol, expiry_str):
         ),
     )
 
-    # 1. Candlestick Trace (Hover info disabled completely)
+    # 1. Candlestick Trace (Empty hovertemplate hides OHLC box while keeping crosshair active)
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -280,13 +280,13 @@ def render_chart(df, symbol, expiry_str):
             decreasing_fillcolor="#f23645",
             decreasing_line_color="#f23645",
             whiskerwidth=0.4,
-            hoverinfo="none",
+            hovertemplate="<extra></extra>",
         ),
         row=1,
         col=1,
     )
 
-    # 2. Position Builder Histogram Trace (Hover info disabled completely)
+    # 2. Position Builder Histogram Trace
     values = df["position_builder_scaled"].fillna(0)
     colors = ["#089981" if v >= 0 else "#f23645" for v in values]
 
@@ -297,7 +297,7 @@ def render_chart(df, symbol, expiry_str):
             name="Net OI Scaled",
             marker_color=colors,
             marker_line_width=0,
-            hoverinfo="none",
+            hovertemplate="<extra></extra>",
         ),
         row=2,
         col=1,
@@ -310,15 +310,15 @@ def render_chart(df, symbol, expiry_str):
         height=530,
         margin=dict(l=20, r=20, t=35, b=20),
         showlegend=False,
-        hovermode=False,  # Completely removes hover tooltips/OHLC boxes
+        hovermode="x",  # Enable crosshair hover triggers across x-axis
         dragmode="pan",
         xaxis_rangeslider_visible=False,
     )
 
-    # Full vertical crosshair spanning continuously across entire chart
+    # X-Axes Configuration with Spike Crosshair & Synchronized Pan/Zoom
     fig.update_xaxes(
         showspikes=True,
-        spikemode="across",
+        spikemode="across+marker",
         spikesnap="cursor",
         spikecolor="#ffffff",
         spikethickness=1,
@@ -327,7 +327,10 @@ def render_chart(df, symbol, expiry_str):
         rangebreaks=[dict(bounds=["sat", "mon"])],
     )
 
-    # Horizontal Crosshair - Price Subplot
+    # Force x-axis of panel 2 to strictly match panel 1 when dragging or panning
+    fig.update_xaxes(matches="x", row=2, col=1)
+
+    # Y-Axes Configuration for Horizontal Spike Lines
     fig.update_yaxes(
         showspikes=True,
         spikemode="across",
@@ -341,7 +344,6 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
-    # Horizontal Crosshair - Histogram Subplot
     fig.update_yaxes(
         showspikes=True,
         spikemode="across",
