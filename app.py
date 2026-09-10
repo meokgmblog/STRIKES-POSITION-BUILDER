@@ -248,7 +248,7 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# CHART RENDERER (FULL CHART CROSSHAIRS & NO OHLC POPUP)
+# CHART RENDERER (FULL CANVAS CROSSHAIR + NO HOVER BOX)
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
@@ -266,7 +266,7 @@ def render_chart(df, symbol, expiry_str):
         ),
     )
 
-    # 1. Candlestick Trace
+    # 1. Candlestick Trace (Empty hovertemplate disables OHLC box)
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -303,22 +303,10 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
-    fig.update_layout(
-        template="plotly_dark",
-        paper_bgcolor="#131722",
-        plot_bgcolor="#131722",
-        height=530,
-        margin=dict(l=20, r=20, t=35, b=20),
-        showlegend=False,
-        hovermode="x unified",  # Unified hover creates continuous vertical crosshair across all subplots
-        dragmode="pan",
-        xaxis_rangeslider_visible=False,
-    )
-
-    # Configure X-Axes for full vertical crosshair line
+    # Spike lines enabled across both subplots
     fig.update_xaxes(
         showspikes=True,
-        spikemode="across+line",
+        spikemode="across+both",
         spikesnap="cursor",
         spikecolor="#ffffff",
         spikethickness=1,
@@ -327,13 +315,11 @@ def render_chart(df, symbol, expiry_str):
         rangebreaks=[dict(bounds=["sat", "mon"])],
     )
 
-    # Force panel 2 x-axis to synchronize 1:1 with panel 1 during panning & zooming
     fig.update_xaxes(matches="x", row=2, col=1)
 
-    # Configure Y-Axes for horizontal crosshair lines on both panels
     fig.update_yaxes(
         showspikes=True,
-        spikemode="across+line",
+        spikemode="across",
         spikesnap="cursor",
         spikecolor="#ffffff",
         spikethickness=1,
@@ -346,7 +332,7 @@ def render_chart(df, symbol, expiry_str):
 
     fig.update_yaxes(
         showspikes=True,
-        spikemode="across+line",
+        spikemode="across",
         spikesnap="cursor",
         spikecolor="#ffffff",
         spikethickness=1,
@@ -356,6 +342,19 @@ def render_chart(df, symbol, expiry_str):
         zerolinecolor="#363a45",
         row=2,
         col=1,
+    )
+
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="#131722",
+        plot_bgcolor="#131722",
+        height=530,
+        margin=dict(l=20, r=20, t=35, b=20),
+        showlegend=False,
+        hovermode="x unified",
+        hoverlabel=dict(bgcolor="rgba(0,0,0,0)", bordercolor="rgba(0,0,0,0)", font_size=1),
+        dragmode="pan",
+        xaxis_rangeslider_visible=False,
     )
 
     config = {
