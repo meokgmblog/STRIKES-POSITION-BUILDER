@@ -248,7 +248,7 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# CHART RENDERER (FULL CROSSHAIR + NO HOVER BOX + SYNCED AXES)
+# CHART RENDERER (SINGLE CROSSHAIR + SYNCHRONIZED PAN/ZOOM)
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
@@ -266,7 +266,7 @@ def render_chart(df, symbol, expiry_str):
         ),
     )
 
-    # 1. Candlestick Trace (Empty hovertemplate hides OHLC box while keeping crosshair active)
+    # 1. Candlestick Trace
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -310,12 +310,22 @@ def render_chart(df, symbol, expiry_str):
         height=530,
         margin=dict(l=20, r=20, t=35, b=20),
         showlegend=False,
-        hovermode="x",  # Enable crosshair hover triggers across x-axis
+        hovermode="x",
         dragmode="pan",
         xaxis_rangeslider_visible=False,
+        hoverlabel=dict(bgcolor="rgba(0,0,0,0)", bordercolor="rgba(0,0,0,0)", font_color="rgba(0,0,0,0)"),
     )
 
-    # X-Axes Configuration with Spike Crosshair & Synchronized Pan/Zoom
+    # Top Subplot X-Axis (Spikes disabled here to prevent double lines)
+    fig.update_xaxes(
+        showspikes=False,
+        gridcolor="#2a2e39",
+        rangebreaks=[dict(bounds=["sat", "mon"])],
+        row=1,
+        col=1,
+    )
+
+    # Bottom Subplot X-Axis (Single unified vertical spike across entire canvas)
     fig.update_xaxes(
         showspikes=True,
         spikemode="across+marker",
@@ -324,13 +334,13 @@ def render_chart(df, symbol, expiry_str):
         spikethickness=1,
         spikedash="dash",
         gridcolor="#2a2e39",
+        matches="x",
         rangebreaks=[dict(bounds=["sat", "mon"])],
+        row=2,
+        col=1,
     )
 
-    # Force x-axis of panel 2 to strictly match panel 1 when dragging or panning
-    fig.update_xaxes(matches="x", row=2, col=1)
-
-    # Y-Axes Configuration for Horizontal Spike Lines
+    # Price Y-Axis (Horizontal Crosshair Spike)
     fig.update_yaxes(
         showspikes=True,
         spikemode="across",
@@ -344,6 +354,7 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
+    # Histogram Y-Axis (Horizontal Crosshair Spike)
     fig.update_yaxes(
         showspikes=True,
         spikemode="across",
