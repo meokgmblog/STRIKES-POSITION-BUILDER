@@ -26,21 +26,42 @@ INTERVAL = 3
 # Hardcoded Access Token (hidden from UI)
 ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI6M0FZSEUiLCJqdGkiOiI6YThkNTc1Y2Y4MTJmNjA0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU"
 
-# List of standard NSE F&O Indices
 MAJOR_INDICES = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50"]
 
 @st.cache_data(ttl=3600)
 def load_fno_symbols():
-    """Reads symbol names from the FNO excel list file and adds major indices."""
+    """
+    Reads symbol names and sector names from FNO all list.xlsx.
+    Tries loading from GitHub raw link first, then falls back to local file.
+    """
     symbols = []
+    github_raw_url = "https://raw.githubusercontent.com/meokgmblog/STRIKES-POSITION-BUILDER/main/FNO%20all%20list.xlsx"
+    
+    df = None
+    # 1. Try fetching directly from GitHub raw URL
     try:
-        fno_df = pd.read_excel("FNO all list.xlsx")
-        excel_symbols = fno_df["SYMBOL"].dropna().astype(str).str.strip().str.upper().unique().tolist()
-        symbols.extend(excel_symbols)
+        res = requests.get(github_raw_url, timeout=10)
+        if res.status_code == 200:
+            df = pd.read_excel(io.BytesIO(res.content))
     except Exception:
-        pass
+        df = None
 
-    # Combine indices and stock symbols while removing duplicates
+    # 2. Fallback to local file if GitHub network fetch fails
+    if df is None:
+        try:
+            df = pd.read_excel("FNO all list.xlsx")
+        except Exception:
+            df = None
+
+    if df is not None:
+        if "SYMBOL" in df.columns:
+            syms = df["SYMBOL"].dropna().astype(str).str.strip().str.upper().tolist()
+            symbols.extend(syms)
+        if "SECTOR" in df.columns:
+            sectors = df["SECTOR"].dropna().astype(str).str.strip().str.upper().unique().tolist()
+            symbols.extend(sectors)
+
+    # Clean up and deduplicate list
     all_symbols = sorted(list(set(MAJOR_INDICES + symbols)))
     return all_symbols
 
@@ -49,7 +70,7 @@ fno_symbol_list = load_fno_symbols()
 # Sidebar Controls
 st.sidebar.title("⚙️ Controls & Parameters")
 
-# Searchable Dropdown for F&O Symbols (Includes Indices + All Stock Symbols from Excel)
+# Searchable Dropdown for F&O Symbols (Includes Stocks, Sectors, and Indices)
 default_index = fno_symbol_list.index("LAURUSLABS") if "LAURUSLABS" in fno_symbol_list else 0
 SYMBOL_INPUT = st.sidebar.selectbox(
     "F&O Symbol",
@@ -116,7 +137,7 @@ def resolve_stock_instruments(master_df, symbol):
 
     clean_symbol = symbol.strip().upper()
 
-    # 1. Spot Key Resolution (Handles Stocks like LAURUSLABS-EQ and Indices like NIFTY 50)
+    # 1. Spot Key Resolution
     spot_mask = (
         (master_df[sym_col].astype(str).str.upper() == clean_symbol) |
         (master_df[sym_col].astype(str).str.upper() == f"{clean_symbol}-EQ") |
@@ -294,7 +315,7 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
-    # Crosshair & Layout setup (Height scaled down to 420px)
+    # Crosshair & Layout setup
     fig.update_layout(
         template="plotly_dark",
         paper_bgcolor="#131722",
