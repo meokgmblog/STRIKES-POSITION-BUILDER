@@ -27,22 +27,30 @@ INTERVAL = 3
 ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI6M0FZSEUiLCJqdGkiOiI6YThkNTc1Y2Y4MTJmNjA0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU"
 
 @st.cache_data(ttl=3600)
+# List of standard NSE F&O Indices
+MAJOR_INDICES = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50"]
+
+@st.cache_data(ttl=3600)
 def load_fno_symbols():
-    """Reads symbol names from the FNO excel list file."""
+    """Reads symbol names from the FNO excel list file and adds major indices."""
+    symbols = []
     try:
         fno_df = pd.read_excel("FNO all list.xlsx")
-        symbols = fno_df["SYMBOL"].dropna().astype(str).str.strip().str.upper().unique().tolist()
-        return sorted(symbols)
+        excel_symbols = fno_df["SYMBOL"].dropna().astype(str).str.strip().str.upper().unique().tolist()
+        symbols.extend(excel_symbols)
     except Exception:
-        # Fallback list if file is inaccessible
-        return ["LAURUSLABS", "NIFTY", "BANKNIFTY"]
+        pass
+
+    # Combine indices and stock symbols while removing duplicates
+    all_symbols = sorted(list(set(MAJOR_INDICES + symbols)))
+    return all_symbols
 
 fno_symbol_list = load_fno_symbols()
 
 # Sidebar Controls
 st.sidebar.title("⚙️ Controls & Parameters")
 
-# Searchable Dropdown for F&O Symbols
+# Searchable Dropdown for F&O Symbols (Includes Indices + All Stock Symbols from Excel)
 default_index = fno_symbol_list.index("LAURUSLABS") if "LAURUSLABS" in fno_symbol_list else 0
 SYMBOL_INPUT = st.sidebar.selectbox(
     "F&O Symbol",
