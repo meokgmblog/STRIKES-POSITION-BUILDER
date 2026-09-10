@@ -314,7 +314,7 @@ def render_chart(df, symbol, expiry_str):
         template="plotly_dark",
         paper_bgcolor="#131722",
         plot_bgcolor="#131722",
-        height=620,
+        height=420,
         margin=dict(l=20, r=20, t=45, b=40),
         showlegend=False,
         hovermode="x",
