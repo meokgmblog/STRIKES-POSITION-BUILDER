@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots  # <--- Added missing import
 import requests
 import streamlit as st
 import streamlit.components.v1 as components
@@ -247,13 +248,13 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# UNIFIED SINGLE CANVAS CHART RENDERER
+# STACKED SUBPLOTS CHART RENDERER
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
     last_time = df["timestamp"].iloc[-1].strftime("%H:%M:%S")
 
-    # Create 2 stacked subplots with ZERO vertical spacing
+    # 2 stacked subplots with zero vertical spacing
     fig = make_subplots(
         rows=2,
         cols=1,
@@ -300,7 +301,7 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
-    # Global crosshair spike styling applied across both rows
+    # Crosshair settings
     spike_config = dict(
         showspikes=True,
         spikemode="across+toaxis",
@@ -311,7 +312,7 @@ def render_chart(df, symbol, expiry_str):
         gridcolor="#2a2e39",
     )
 
-    # Configure X Axes (Shared crosshair line across top and bottom panels)
+    # Configure X Axes
     fig.update_xaxes(
         **spike_config,
         rangebreaks=[dict(bounds=["sat", "mon"])],
@@ -328,7 +329,7 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
-    # Configure Y Axis - Top (Price)
+    # Configure Y Axis - Price (Top)
     fig.update_yaxes(
         **spike_config,
         side="right",
@@ -337,7 +338,7 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
-    # Configure Y Axis - Bottom (Histogram Baseline)
+    # Configure Y Axis - Bottom Histogram
     fig.update_yaxes(
         showspikes=False,
         side="right",
