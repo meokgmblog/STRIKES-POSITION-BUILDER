@@ -303,21 +303,14 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
-    # Crosshair Spike configuration on X-Axes
+    # Standard axis setups
     fig.update_xaxes(
-        showspikes=True,
-        spikemode="across+toaxis",
-        spikesnap="cursor",
-        spikecolor="#ffffff",
-        spikethickness=1,
-        spikedash="dash",
-        spikedistance=-1,  # Forces spike evaluation across full chart canvas width/height
+        showspikes=False,  # Handled via JavaScript crosshair engine below
         gridcolor="#2a2e39",
         rangebreaks=[dict(bounds=["sat", "mon"])],
         matches="x",
     )
 
-    # Horizontal Crosshair - Price Subplot
     fig.update_yaxes(
         showspikes=True,
         spikemode="across+toaxis",
@@ -325,14 +318,12 @@ def render_chart(df, symbol, expiry_str):
         spikecolor="#ffffff",
         spikethickness=1,
         spikedash="dash",
-        spikedistance=-1,
         gridcolor="#2a2e39",
         zerolinecolor="#363a45",
         row=1,
         col=1,
     )
 
-    # Horizontal Crosshair - Position Builder Subplot
     fig.update_yaxes(
         showspikes=True,
         spikemode="across+toaxis",
@@ -340,7 +331,6 @@ def render_chart(df, symbol, expiry_str):
         spikecolor="#ffffff",
         spikethickness=1,
         spikedash="dash",
-        spikedistance=-1,
         range=[-110, 110],
         gridcolor="#2a2e39",
         zerolinecolor="#363a45",
@@ -355,9 +345,7 @@ def render_chart(df, symbol, expiry_str):
         height=530,
         margin=dict(l=20, r=20, t=35, b=20),
         showlegend=False,
-        hovermode="x",
-        hoverdistance=-1,
-        spikedistance=-1,
+        hovermode="x unified",
         dragmode="pan",
         xaxis_rangeslider_visible=False,
     )
@@ -371,24 +359,53 @@ def render_chart(df, symbol, expiry_str):
 
     st.plotly_chart(fig, use_container_width=True, config=config)
 
-    # CSS Injection to allow spike lines to overflow subplot container boundary boxes
-    st.markdown(
+    # JavaScript Overlay Engine to bridge the two subplots together dynamically
+    st.components.v1.html(
         """
-        <style>
-        .js-plotly-plot .plotly .spikeline {
-            stroke-dasharray: 3px, 3px !important;
-            stroke: #ffffff !important;
-            stroke-width: 1px !important;
+        <script>
+        function attachCrosshairEngine() {
+            const chartDivs = window.parent.document.querySelectorAll('.stPlotlyChart .js-plotly-plot');
+            if (chartDivs.length === 0) {
+                setTimeout(attachCrosshairEngine, 200);
+                return;
+            }
+
+            chartDivs.forEach(gd => {
+                if (gd.dataset.crosshairAttached) return;
+                gd.dataset.crosshairAttached = "true";
+
+                // Create full overlay canvas
+                let line = document.createElement('div');
+                line.style.position = 'absolute';
+                line.style.borderLeft = '1px dashed #ffffff';
+                line.style.pointerEvents = 'none';
+                line.style.zIndex = '9999';
+                line.style.display = 'none';
+                line.style.top = '0px';
+                line.style.bottom = '0px';
+                gd.appendChild(line);
+
+                gd.on('plotly_hover', function(data) {
+                    if (data.points && data.points.length > 0) {
+                        let pt = data.points[0];
+                        let xaxis = gd._fullLayout.xaxis;
+                        if (xaxis && pt.x) {
+                            let xPx = xaxis.d2p(pt.x) + xaxis._offset;
+                            line.style.left = xPx + 'px';
+                            line.style.display = 'block';
+                        }
+                    }
+                });
+
+                gd.on('plotly_unhover', function() {
+                    line.style.display = 'none';
+                });
+            });
         }
-        .js-plotly-plot .plotly .subplot {
-            overflow: visible !important;
-        }
-        .js-plotly-plot .plotly .cartesianlayer {
-            overflow: visible !important;
-        }
-        </style>
+        setTimeout(attachCrosshairEngine, 500);
+        </script>
         """,
-        unsafe_allow_html=True,
+        height=0,
     )
 
 # ================================================================
