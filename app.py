@@ -9,7 +9,6 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import requests
 import streamlit as st
 import streamlit.components.v1 as components
@@ -24,7 +23,7 @@ MARKET_START = "09:15"
 MARKET_END = "15:30"
 INTERVAL = 3
 
-ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI6M0FZSEUiLCJqdGkiOiI6YThkNTc1Y2Y4MTJmNjA0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhapI1ZXJ2aWNlIiwiZXhwIjoxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU"
+ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI6M0FZSEUiLCJqdGkiOiI6YThkNTc1Y2Y4MTJmZmQ0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhapI1ZXJ2aWNlIiwiZXhwIjoxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU"
 
 MAJOR_INDICES = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50"]
 
@@ -248,25 +247,32 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# CHART RENDERER (TRADINGVIEW STYLE CROSSHAIR)
+# UNIFIED SINGLE CANVAS CHART RENDERER
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
     last_time = df["timestamp"].iloc[-1].strftime("%H:%M:%S")
 
-    fig = make_subplots(
-        rows=2,
-        cols=1,
-        shared_xaxes=True,
-        vertical_spacing=0.03,
-        row_heights=[0.58, 0.42],
-        subplot_titles=(
-            f"{symbol} Spot | 3m | Last: {last_price:.2f} | Updated: {last_time} IST",
-            f"POSITION BUILDER HISTOGRAM ({expiry_str})",
-        ),
+    fig = go.Figure()
+
+    # 1. Position Builder Histogram Trace (Y2 Axis - Overlayed in Background)
+    values = df["position_builder_scaled"].fillna(0)
+    colors = ["#089981" if v >= 0 else "#f23645" for v in values]
+
+    fig.add_trace(
+        go.Bar(
+            x=df["timestamp"],
+            y=values,
+            name="Net OI Scaled",
+            marker_color=colors,
+            marker_line_width=0,
+            opacity=0.35,
+            yaxis="y2",
+            hovertemplate="Net OI Scaled: %{y:.1f}<extra></extra>",
+        )
     )
 
-    # 1. Candlestick Trace
+    # 2. Candlestick Price Trace (Y1 Axis)
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -280,74 +286,58 @@ def render_chart(df, symbol, expiry_str):
             decreasing_fillcolor="#f23645",
             decreasing_line_color="#f23645",
             whiskerwidth=0.4,
-            hovertemplate="<extra></extra>",
-        ),
-        row=1,
-        col=1,
-    )
-
-    # 2. Position Builder Histogram Trace
-    values = df["position_builder_scaled"].fillna(0)
-    colors = ["#089981" if v >= 0 else "#f23645" for v in values]
-
-    fig.add_trace(
-        go.Bar(
-            x=df["timestamp"],
-            y=values,
-            name="Net OI Scaled",
-            marker_color=colors,
-            marker_line_width=0,
-            hovertemplate="<extra></extra>",
-        ),
-        row=2,
-        col=1,
-    )
-
-    # Standard axis setups
-    fig.update_xaxes(
-        showspikes=False,  # Handled via JavaScript crosshair engine below
-        gridcolor="#2a2e39",
-        rangebreaks=[dict(bounds=["sat", "mon"])],
-        matches="x",
-    )
-
-    fig.update_yaxes(
-        showspikes=True,
-        spikemode="across+toaxis",
-        spikesnap="cursor",
-        spikecolor="#ffffff",
-        spikethickness=1,
-        spikedash="dash",
-        gridcolor="#2a2e39",
-        zerolinecolor="#363a45",
-        row=1,
-        col=1,
-    )
-
-    fig.update_yaxes(
-        showspikes=True,
-        spikemode="across+toaxis",
-        spikesnap="cursor",
-        spikecolor="#ffffff",
-        spikethickness=1,
-        spikedash="dash",
-        range=[-110, 110],
-        gridcolor="#2a2e39",
-        zerolinecolor="#363a45",
-        row=2,
-        col=1,
+            yaxis="y1",
+            hovertemplate="Open: %{open:.2f}<br>High: %{high:.2f}<br>Low: %{low:.2f}<br>Close: %{close:.2f}<extra></extra>",
+        )
     )
 
     fig.update_layout(
+        title=dict(
+            text=f"<b>{symbol} Spot</b> (3m) | Last: {last_price:.2f} | Updated: {last_time} IST | {expiry_str}",
+            font=dict(size=14, color="#d1d4dc"),
+            x=0.01,
+            y=0.98,
+        ),
         template="plotly_dark",
         paper_bgcolor="#131722",
         plot_bgcolor="#131722",
-        height=530,
-        margin=dict(l=20, r=20, t=35, b=20),
+        height=580,
+        margin=dict(l=20, r=20, t=45, b=20),
         showlegend=False,
         hovermode="x unified",
         dragmode="pan",
-        xaxis_rangeslider_visible=False,
+        xaxis=dict(
+            type="date",
+            showspikes=True,
+            spikemode="across",
+            spikesnap="cursor",
+            spikecolor="#ffffff",
+            spikethickness=1,
+            spikedash="dash",
+            gridcolor="#2a2e39",
+            rangebreaks=[dict(bounds=["sat", "mon"])],
+            rangeslider=dict(visible=False),
+        ),
+        yaxis=dict(
+            title="Price",
+            showspikes=True,
+            spikemode="across",
+            spikesnap="cursor",
+            spikecolor="#ffffff",
+            spikethickness=1,
+            spikedash="dash",
+            gridcolor="#2a2e39",
+            side="right",
+        ),
+        yaxis2=dict(
+            title="Position Builder",
+            overlaying="y",
+            side="left",
+            range=[-110, 110],
+            showgrid=False,
+            zeroline=True,
+            zerolinecolor="#363a45",
+        ),
     )
 
     config = {
@@ -358,55 +348,6 @@ def render_chart(df, symbol, expiry_str):
     }
 
     st.plotly_chart(fig, use_container_width=True, config=config)
-
-    # JavaScript Overlay Engine to bridge the two subplots together dynamically
-    st.components.v1.html(
-        """
-        <script>
-        function attachCrosshairEngine() {
-            const chartDivs = window.parent.document.querySelectorAll('.stPlotlyChart .js-plotly-plot');
-            if (chartDivs.length === 0) {
-                setTimeout(attachCrosshairEngine, 200);
-                return;
-            }
-
-            chartDivs.forEach(gd => {
-                if (gd.dataset.crosshairAttached) return;
-                gd.dataset.crosshairAttached = "true";
-
-                // Create full overlay canvas
-                let line = document.createElement('div');
-                line.style.position = 'absolute';
-                line.style.borderLeft = '1px dashed #ffffff';
-                line.style.pointerEvents = 'none';
-                line.style.zIndex = '9999';
-                line.style.display = 'none';
-                line.style.top = '0px';
-                line.style.bottom = '0px';
-                gd.appendChild(line);
-
-                gd.on('plotly_hover', function(data) {
-                    if (data.points && data.points.length > 0) {
-                        let pt = data.points[0];
-                        let xaxis = gd._fullLayout.xaxis;
-                        if (xaxis && pt.x) {
-                            let xPx = xaxis.d2p(pt.x) + xaxis._offset;
-                            line.style.left = xPx + 'px';
-                            line.style.display = 'block';
-                        }
-                    }
-                });
-
-                gd.on('plotly_unhover', function() {
-                    line.style.display = 'none';
-                });
-            });
-        }
-        setTimeout(attachCrosshairEngine, 500);
-        </script>
-        """,
-        height=0,
-    )
 
 # ================================================================
 # MAIN EXECUTION ENGINE
