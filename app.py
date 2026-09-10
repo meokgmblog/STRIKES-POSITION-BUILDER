@@ -25,7 +25,7 @@ MARKET_END = "15:30"
 INTERVAL = 3
 
 # Hardcoded Access Token (hidden from UI)
-ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI6M0FZSEUiLCJqdGkiOiI6YThkNTc1Y2Y4MTJmNjA0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU"
+ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI6M0FZSEUiLCJqdGkiOiI6YThkNTc1Y2Y4MTJmNjA0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhapI1ZXJ2aWNlIiwiZXhwIjoxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU"
 
 MAJOR_INDICES = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50"]
 
@@ -135,7 +135,6 @@ def fetch_upstox_master_instruments():
 def resolve_stock_instruments(master_df, symbol):
     """
     Dynamically resolves Spot key, Futures key, and Option chains for stocks and indices.
-    Handles Upstox naming conventions (e.g., LAURUSLABS-EQ, NSE_EQ segment).
     """
     key_col = "instrument_key" if "instrument_key" in master_df.columns else "instrument_token"
     sym_col = "trading_symbol" if "trading_symbol" in master_df.columns else "tradingsymbol"
@@ -157,7 +156,6 @@ def resolve_stock_instruments(master_df, symbol):
     spot_rows = master_df[spot_mask]
 
     if spot_rows.empty:
-        # Broader fallback search across trading symbol prefix
         spot_rows = master_df[
             master_df[sym_col].astype(str).str.upper().str.startswith(clean_symbol) &
             master_df[type_col].astype(str).str.upper().str.contains("EQ|EQUITY|INDEX|NSE_EQ", regex=True)
@@ -268,25 +266,27 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# PLOTLY CHART RENDERER
+# MERGED SINGLE-PANEL PLOTLY CHART RENDERER WITH FULL CROSSHAIR
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
     last_time = df["timestamp"].iloc[-1].strftime("%H:%M:%S")
 
+    # Enlarged Position Builder height ratio (~40% of total height)
+    # Both Candlestick and Histogram are linked in a unified subplot system
     fig = make_subplots(
         rows=2,
         cols=1,
         shared_xaxes=True,
-        vertical_spacing=0.03,
-        row_heights=[0.68, 0.32],
+        vertical_spacing=0.04,
+        row_heights=[0.58, 0.42],  # Enlarged position builder panel
         subplot_titles=(
             f"{symbol} Spot | 3m | Last: {last_price:.2f} | Updated: {last_time} IST",
             f"POSITION BUILDER HISTOGRAM ({expiry_str})",
         ),
     )
 
-    # 1. Candlestick Trace
+    # 1. Candlestick Trace (Row 1)
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -300,13 +300,13 @@ def render_chart(df, symbol, expiry_str):
             decreasing_fillcolor="#f23645",
             decreasing_line_color="#f23645",
             whiskerwidth=0.4,
-            hoverinfo="x+name",
+            hoverinfo="x+y+name",
         ),
         row=1,
         col=1,
     )
 
-    # 2. Position Builder Histogram
+    # 2. Position Builder Histogram (Row 2 - Enlarged)
     values = df["position_builder_scaled"].fillna(0)
     colors = ["#089981" if v >= 0 else "#f23645" for v in values]
 
@@ -323,19 +323,20 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
-    # Crosshair & Layout setup
+    # Combined Layout & Full Crosshair Config (Dual-Axis Horizontal & Vertical Lines)
     fig.update_layout(
         template="plotly_dark",
         paper_bgcolor="#131722",
         plot_bgcolor="#131722",
-        height=420,
-        margin=dict(l=15, r=15, t=35, b=15),
+        height=520,  # Increased overall chart height for better proportions
+        margin=dict(l=20, r=20, t=35, b=20),
         showlegend=False,
         hovermode="x unified",
         dragmode="pan",
         xaxis_rangeslider_visible=False,
     )
 
+    # Synchronized Vertical & Horizontal Crosshairs on both axes
     fig.update_xaxes(
         showspikes=True,
         spikemode="across",
@@ -347,8 +348,28 @@ def render_chart(df, symbol, expiry_str):
         rangebreaks=[dict(bounds=["sat", "mon"])],
     )
 
-    fig.update_yaxes(gridcolor="#2a2e39", zerolinecolor="#363a45", row=1, col=1)
+    # Horizontal Crosshair on Price Subplot
     fig.update_yaxes(
+        showspikes=True,
+        spikemode="across",
+        spikesnap="cursor",
+        spikecolor="#89929e",
+        spikethickness=1,
+        spikedash="dash",
+        gridcolor="#2a2e39",
+        zerolinecolor="#363a45",
+        row=1,
+        col=1,
+    )
+
+    # Horizontal Crosshair on Position Builder Subplot
+    fig.update_yaxes(
+        showspikes=True,
+        spikemode="across",
+        spikesnap="cursor",
+        spikecolor="#89929e",
+        spikethickness=1,
+        spikedash="dash",
         range=[-110, 110],
         gridcolor="#2a2e39",
         zerolinecolor="#363a45",
@@ -388,7 +409,6 @@ try:
     unique_strikes = sorted(opts_df["strike_num"].dropna().unique())
 
     if len(unique_strikes) > 1:
-        # Detect standard strike intervals dynamically
         strike_diffs = np.diff(unique_strikes)
         step_size = float(np.median(strike_diffs))
     else:
