@@ -1,5 +1,6 @@
 import gzip
 import io
+import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -26,43 +27,58 @@ INTERVAL = 3
 # Hardcoded Access Token (hidden from UI)
 ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI6M0FZSEUiLCJqdGkiOiI6YThkNTc1Y2Y4MTJmNjA0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU"
 
-# Complete master list of all F&O stocks, sectors, and indices from Excel
-FNO_MASTER_LIST = [
-    "360ONE", "ABB", "ABCAPITAL", "ADANIENSOL", "ADANIENT", "ADANIGREEN", "ADANIPORTS", "ADANIPOWER", 
-    "ALKEM", "AMBER", "AMBUJACEM", "ANGELONE", "APLAPOLLO", "APOLLOHOSP", "ASHOKLEY", "ASIANPAINT", 
-    "ASTRAL", "AUBANK", "AUROPHARMA", "AUTO", "AXISBANK", "BANK", "BANKBARODA", "BANKNIFTY", 
-    "BBDOWN", "BEL", "BHARATFORG", "BHARTIARTL", "BHEL", "BIOCON", "BOSCHLTD", "BPCL", "BRITANNIA", 
-    "BSOFT", "CANBK", "CANFINHOME", "CDSL", "CEMENT", "CGPOWER", "CHAMBLFERT", "CHOLAFIN", "CIPLA", 
-    "COALINDIA", "COFORGE", "COLPAL", "CONCOR", "COROMANDEL", "CROMPTON", "CUMMINSIND", "CYIENT", 
-    "DABUR", "DALBHARAT", "DEEPAKNTR", "DELHIVERY", "DIVISLAB", "DIXON", "DLF", "DMART", "DRREDDY", 
-    "EICHERMOT", "ENERGY", "ESCORTS", "ETFLONG", "EXIDEIND", "FEDERALBNK", "FINNIFTY", "FIN SERVICE", 
-    "FMCG", "FORTIS", "GAIL", "GLENMARK", "GMRAIRPORT", "GNFC", "GODREJPROP", "GRANULES", "GRASIM", 
-    "GUJGASLTD", "HAL", "HAVELLS", "HCLTECH", "HDFCAMC", "HDFCBANK", "HDFCLIFE", "HEROMOTOCO", 
-    "HFCL", "HINDALCO", "HAL", "HINDCOPPER", "HINDPETRO", "HINDUNILVR", "HUDCO", "ICICIBANK", 
-    "ICICIGI", "ICICIPRULI", "IDEA", "IDFCFIRSTB", "IEX", "IGL", "INDHOTEL", "INDIAMART", 
-    "INDIANB", "INDIGO", "INDUSINDBK", "INDUSTOWER", "INFY", "INOXWIND", "IOC", "IPCALAB", 
-    "IRCTC", "IREDA", "IRFC", "IT", "ITC", "JINDALSTEL", "JIOFIN", "JSWENERGY", "JSWSTEEL", 
-    "JUBLFOOD", "KALYANKJIL", "KEI", "KEI", "KPITTECH", "KPRMILL", "LALPATHLAB", "LAURUSLABS", 
-    "LICHSGFIN", "LICI", "LODHA", "LT", "LTF", "LTIM", "LTTS", "LUPIN", "M&M", "M&MFIN", 
-    "MANAPPURAM", "MARICO", "MARUTI", "MAXHEALTH", "MCX", "METAL", "METROPOLIS", "MFSL", "MGFL", 
-    "MIDCPNIFTY", "MOTHERSON", "MPHASIS", "MRF", "MUTHOOTFIN", "NATIONALUM", "NAUKRI", "NAVINFLUOR", 
-    "NCC", "NESTLEIND", "NHPC", "NIFTY", "NIFTY MID SELECT", "NIFTY50", "NIFTYNXT50", "NMDC", 
-    "NTPC", "NYKAA", "OBEROIRLTY", "OFSS", "OIL", "ONGC", "PAGEIND", "PERSISTENT", "PETRONET", 
-    "PFC", "PHARMA", "PIDILITIND", "PIIND", "PNB", "POLYCAB", "POONAWALLA", "POWERGRID", "PRESTIGE", 
-    "PSU BANK", "PVT BANK", "RAILTEL", "RAMCOCEM", "RBLBANK", "RECLTD", "REALTY", "RELIANCE", 
-    "RVNL", "SAIL", "SBICARD", "SBILIFE", "SBIN", "SENSEX", "SHREECEM", "SHRIRAMFIN", "SIEMENS", 
-    "SJVN", "SOLARINDS", "SONACOMS", "SRF", "SUZLON", "SYNGENE", "TATACHEM", "TATACOMM", "TATACONSUM", 
-    "TATAELEXSI", "TATAMOTORS", "TATAPOWER", "TATASTEEL", "TCS", "TECHM", "TIINDIA", "TITAN", 
-    "TORNTPHARM", "TORNTPOWER", "TRENT", "TVSMOTOR", "UBL", "ULTRACEMCO", "UNIONBANK", "UNITDSPR", 
-    "UNOMINDA", "UPL", "VBL", "VEDL", "VOLTAS", "WIPRO", "YESBANK", "ZYDUSLIFE"
-]
+MAJOR_INDICES = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50"]
 
-fno_symbol_list = sorted(list(set(FNO_MASTER_LIST)))
+@st.cache_data(ttl=3600)
+def load_fno_symbols():
+    """
+    Reads symbol names from 'FNO ALL LIST.txt'.
+    Tries fetching from GitHub repository first, then checks local folder.
+    """
+    symbols = []
+    
+    # 1. Try reading from GitHub raw link
+    github_urls = [
+        "https://raw.githubusercontent.com/meokgmblog/STRIKES-POSITION-BUILDER/main/FNO%20ALL%20LIST.txt",
+        "https://raw.githubusercontent.com/meokgmblog/STRIKES-POSITION-BUILDER/main/FNO_ALL_LIST.txt",
+        "https://raw.githubusercontent.com/meokgmblog/STRIKES-POSITION-BUILDER/main/FNO%20all%20list.txt"
+    ]
+    
+    for url in github_urls:
+        try:
+            res = requests.get(url, timeout=5)
+            if res.status_code == 200 and res.text.strip():
+                lines = res.text.splitlines()
+                symbols = [line.strip().upper() for line in lines if line.strip()]
+                if len(symbols) > 5:
+                    break
+        except Exception:
+            continue
+
+    # 2. Fallback to local .txt files if GitHub fetch fails
+    if not symbols:
+        possible_filenames = ["FNO ALL LIST.txt", "FNO_ALL_LIST.txt", "FNO all list.txt", "fno_all_list.txt"]
+        for fname in possible_filenames:
+            if os.path.exists(fname):
+                try:
+                    with open(fname, "r", encoding="utf-8") as f:
+                        lines = f.readlines()
+                        symbols = [line.strip().upper() for line in lines if line.strip()]
+                        if len(symbols) > 5:
+                            break
+                except Exception:
+                    continue
+
+    # Clean and deduplicate combined list with major indices
+    all_symbols = sorted(list(set(MAJOR_INDICES + symbols)))
+    return all_symbols
+
+fno_symbol_list = load_fno_symbols()
 
 # Sidebar Controls
 st.sidebar.title("⚙️ Controls & Parameters")
 
-# Searchable Dropdown for F&O Symbols (Default: NIFTY)
+# Searchable Dropdown for F&O Symbols (Defaults to NIFTY)
 default_index = fno_symbol_list.index("NIFTY") if "NIFTY" in fno_symbol_list else 0
 SYMBOL_INPUT = st.sidebar.selectbox(
     "F&O Symbol",
