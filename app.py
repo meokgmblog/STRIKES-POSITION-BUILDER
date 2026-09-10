@@ -255,7 +255,7 @@ def render_chart(df, symbol, expiry_str):
 
     fig = go.Figure()
 
-    # 1. Position Builder Histogram Trace (Y2 Axis - Overlayed in Background)
+    # 1. Position Builder Histogram Trace (Y2 Axis - Fixed at Bottom Pane)
     values = df["position_builder_scaled"].fillna(0)
     colors = ["#089981" if v >= 0 else "#f23645" for v in values]
 
@@ -266,7 +266,7 @@ def render_chart(df, symbol, expiry_str):
             name="Net OI Scaled",
             marker_color=colors,
             marker_line_width=0,
-            opacity=0.35,
+            opacity=0.45,
             yaxis="y2",
             hovertemplate="Net OI Scaled: %{y:.1f}<extra></extra>",
         )
@@ -301,7 +301,7 @@ def render_chart(df, symbol, expiry_str):
         template="plotly_dark",
         paper_bgcolor="#131722",
         plot_bgcolor="#131722",
-        height=580,
+        height=600,
         margin=dict(l=20, r=20, t=45, b=20),
         showlegend=False,
         hovermode="x unified",
@@ -329,12 +329,14 @@ def render_chart(df, symbol, expiry_str):
             gridcolor="#2a2e39",
             side="right",
         ),
+        # yaxis2 controls the bottom volume-style overlay region
         yaxis2=dict(
-            title="Position Builder",
+            title="",
             overlaying="y",
             side="left",
-            range=[-110, 110],
+            range=[-110, 420],  # Pushes the histogram down to occupy only ~25% of the bottom chart
             showgrid=False,
+            showticklabels=False,  # Keeps price pane clean like TradingView
             zeroline=True,
             zerolinecolor="#363a45",
         ),
