@@ -303,17 +303,31 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
-    # Synchronize and extend vertical crosshair across both subplots
-    fig.update_xaxes(
-        showspikes=True,
-        spikemode="across+toaxis",
-        spikesnap="cursor",
-        spikecolor="#ffffff",
-        spikethickness=1,
-        spikedash="dash",
-        gridcolor="#2a2e39",
-        rangebreaks=[dict(bounds=["sat", "mon"])],
-        matches="x",
+    # Synchronize X-axis panning/zooming
+    fig.update_xaxes(matches="x")
+
+    # Configure top and bottom vertical crosshair spikes to span across subplots
+    fig.update_layout(
+        xaxis=dict(
+            showspikes=True,
+            spikemode="across",
+            spikesnap="cursor",
+            spikecolor="#ffffff",
+            spikethickness=1,
+            spikedash="dash",
+            gridcolor="#2a2e39",
+            rangebreaks=[dict(bounds=["sat", "mon"])],
+        ),
+        xaxis2=dict(
+            showspikes=True,
+            spikemode="across",
+            spikesnap="cursor",
+            spikecolor="#ffffff",
+            spikethickness=1,
+            spikedash="dash",
+            gridcolor="#2a2e39",
+            rangebreaks=[dict(bounds=["sat", "mon"])],
+        ),
     )
 
     # Horizontal Crosshair - Price Subplot
@@ -352,7 +366,7 @@ def render_chart(df, symbol, expiry_str):
         height=530,
         margin=dict(l=20, r=20, t=35, b=20),
         showlegend=False,
-        hovermode="x unified",  # Unified hover mode anchors vertical crosshair across all subplots
+        hovermode="x",
         dragmode="pan",
         xaxis_rangeslider_visible=False,
     )
