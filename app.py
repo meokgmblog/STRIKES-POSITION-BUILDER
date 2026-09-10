@@ -248,7 +248,7 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# SINGLE UNIFIED CROSSHAIR CHART RENDERER
+# FULL-CANVAS SINGLE CONTINUOUS CROSSHAIR RENDERER
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
@@ -258,8 +258,8 @@ def render_chart(df, symbol, expiry_str):
         rows=2,
         cols=1,
         shared_xaxes=True,
-        vertical_spacing=0.02,  # Minimized spacing so the vertical crosshair spans smoothly
-        row_heights=[0.58, 0.42],  # Enlarged position builder panel
+        vertical_spacing=0.03,
+        row_heights=[0.58, 0.42],
         subplot_titles=(
             f"{symbol} Spot | 3m | Last: {last_price:.2f} | Updated: {last_time} IST",
             f"POSITION BUILDER HISTOGRAM ({expiry_str})",
@@ -286,7 +286,7 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
-    # 2. Position Builder Histogram (Enlarged Panel)
+    # 2. Position Builder Histogram Trace
     values = df["position_builder_scaled"].fillna(0)
     colors = ["#089981" if v >= 0 else "#f23645" for v in values]
 
@@ -303,6 +303,19 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
+    # 3. Full Canvas Vertical Crosshair overlay trace (spans y=0 to y=1 across all rows)
+    fig.add_trace(
+        go.Scatter(
+            x=df["timestamp"],
+            y=[0.5] * len(df),
+            mode="lines",
+            line=dict(width=0, color="rgba(0,0,0,0)"),
+            hoverinfo="none",
+            showlegend=False,
+            yaxis="y3",
+        )
+    )
+
     fig.update_layout(
         template="plotly_dark",
         paper_bgcolor="#131722",
@@ -313,20 +326,27 @@ def render_chart(df, symbol, expiry_str):
         hovermode="x unified",
         dragmode="pan",
         xaxis_rangeslider_visible=False,
+        # Secondary Y-Axis spanning entire canvas domain for uninterrupted vertical spike
+        yaxis3=dict(
+            overlaying="y",
+            visible=False,
+            range=[0, 1],
+            showspikes=True,
+            spikemode="across",
+            spikecolor="#cccccc",
+            spikethickness=1,
+            spikedash="dash",
+        )
     )
 
-    # Unified Full-Chart Vertical Crosshair
+    # Disable row-level x-spikes to avoid broken segmented lines
     fig.update_xaxes(
-        showspikes=True,
-        spikemode="across+marker",
-        spikecolor="#cccccc",
-        spikethickness=1,
-        spikedash="dash",
+        showspikes=False,
         gridcolor="#2a2e39",
         rangebreaks=[dict(bounds=["sat", "mon"])],
     )
 
-    # Horizontal Crosshair - Price Subplot
+    # Horizontal Crosshair on Price Subplot
     fig.update_yaxes(
         showspikes=True,
         spikemode="across",
@@ -339,7 +359,7 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
-    # Horizontal Crosshair - Histogram Subplot
+    # Horizontal Crosshair on Histogram Subplot
     fig.update_yaxes(
         showspikes=True,
         spikemode="across",
