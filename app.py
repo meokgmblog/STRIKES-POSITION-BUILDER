@@ -248,7 +248,7 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# CHART RENDERER WITH FULL CANVAS CROSSHAIR OVERLAY
+# CHART RENDERER (TRADINGVIEW-STYLE FULL CROSSHAIR)
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
@@ -266,7 +266,7 @@ def render_chart(df, symbol, expiry_str):
         ),
     )
 
-    # 1. Candlestick Trace (hoverinfo="none" suppresses native OHLC tooltips)
+    # Candlestick Trace (hoverinfo="none" disables OHLC box completely)
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -286,7 +286,7 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
-    # 2. Position Builder Histogram Trace
+    # Position Builder Histogram Trace
     values = df["position_builder_scaled"].fillna(0)
     colors = ["#089981" if v >= 0 else "#f23645" for v in values]
 
@@ -303,27 +303,23 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
+    # Synchronize X axes across both panels
     fig.update_xaxes(
         gridcolor="#2a2e39",
         rangebreaks=[dict(bounds=["sat", "mon"])],
-    )
-
-    fig.update_xaxes(matches="x", row=2, col=1)
-
-    fig.update_yaxes(
-        gridcolor="#2a2e39",
-        zerolinecolor="#363a45",
         row=1,
         col=1,
     )
-
-    fig.update_yaxes(
-        range=[-110, 110],
+    fig.update_xaxes(
         gridcolor="#2a2e39",
-        zerolinecolor="#363a45",
+        rangebreaks=[dict(bounds=["sat", "mon"])],
+        matches="x",
         row=2,
         col=1,
     )
+
+    fig.update_yaxes(gridcolor="#2a2e39", zerolinecolor="#363a45", row=1, col=1)
+    fig.update_yaxes(gridcolor="#2a2e39", zerolinecolor="#363a45", range=[-110, 110], row=2, col=1)
 
     fig.update_layout(
         template="plotly_dark",
@@ -346,74 +342,57 @@ def render_chart(df, symbol, expiry_str):
 
     st.plotly_chart(fig, use_container_width=True, config=config)
 
-    # Full DOM Crosshair Overlay script
+    # Inject DOM Crosshair Script for TradingView Full-Canvas Crosshair Lines
     components.html(
         """
         <script>
-        (function() {
-            function attachCrosshair() {
-                const parentDoc = window.parent.document;
-                const plotContainer = parentDoc.querySelector('.stPlotlyChart');
-                if (!plotContainer) {
-                    setTimeout(attachCrosshair, 300);
-                    return;
-                }
-
-                // Remove existing crosshair element if present
-                let existingV = parentDoc.getElementById('custom-v-crosshair');
-                let existingH = parentDoc.getElementById('custom-h-crosshair');
-                if (existingV) existingV.remove();
-                if (existingH) existingH.remove();
-
-                const vLine = parentDoc.createElement('div');
-                vLine.id = 'custom-v-crosshair';
-                vLine.style.position = 'absolute';
-                vLine.style.top = '0px';
-                vLine.style.bottom = '0px';
-                vLine.style.width = '1px';
-                vLine.style.borderLeft = '1px dashed #ffffff';
-                vLine.style.pointerEvents = 'none';
-                vLine.style.zIndex = '9999';
-                vLine.style.display = 'none';
-
-                const hLine = parentDoc.createElement('div');
-                hLine.id = 'custom-h-crosshair';
-                hLine.style.position = 'absolute';
-                hLine.style.left = '0px';
-                hLine.style.right = '0px';
-                hLine.style.height = '1px';
-                hLine.style.borderTop = '1px dashed #ffffff';
-                hLine.style.pointerEvents = 'none';
-                hLine.style.zIndex = '9999';
-                hLine.style.display = 'none';
-
-                plotContainer.style.position = 'relative';
-                plotContainer.appendChild(vLine);
-                plotContainer.appendChild(hLine);
-
-                plotContainer.addEventListener('mousemove', function(e) {
-                    const rect = plotContainer.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    const y = e.clientY - rect.top;
-
-                    if (x >= 0 && x <= rect.width && y >= 0 && y <= rect.height) {
-                        vLine.style.left = x + 'px';
-                        vLine.style.display = 'block';
-                        hLine.style.top = y + 'px';
-                        hLine.style.display = 'block';
-                    } else {
-                        vLine.style.display = 'none';
-                        hLine.style.display = 'none';
-                    }
-                });
-
-                plotContainer.addEventListener('mouseleave', function() {
-                    vLine.style.display = 'none';
-                    hLine.style.display = 'none';
-                });
+        (function attachCrosshair() {
+            const parentDoc = window.parent.document;
+            const container = parentDoc.querySelector('.stPlotlyChart');
+            if (!container) {
+                setTimeout(attachCrosshair, 300);
+                return;
             }
 
-            setTimeout(attachCrosshair, 500);
+            let vLine = parentDoc.getElementById('tv-crosshair-v');
+            let hLine = parentDoc.getElementById('tv-crosshair-h');
+
+            if (!vLine) {
+                vLine = parentDoc.createElement('div');
+                vLine.id = 'tv-crosshair-v';
+                vLine.style.cssText = 'position:absolute;top:0;bottom:0;width:1px;border-left:1px dashed #ffffff;pointer-events:none;z-index:9999;display:none;';
+                container.style.position = 'relative';
+                container.appendChild(vLine);
+            }
+
+            if (!hLine) {
+                hLine = parentDoc.createElement('div');
+                hLine.id = 'tv-crosshair-h';
+                hLine.style.cssText = 'position:absolute;left:0;right:0;height:1px;border-top:1px dashed #ffffff;pointer-events:none;z-index:9999;display:none;';
+                container.style.position = 'relative';
+                container.appendChild(hLine);
+            }
+
+            container.addEventListener('mousemove', (e) => {
+                const rect = container.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                if (x >= 0 && x <= rect.width && y >= 0 && y <= rect.height) {
+                    vLine.style.left = x + 'px';
+                    vLine.style.display = 'block';
+                    hLine.style.top = y + 'px';
+                    hLine.style.display = 'block';
+                } else {
+                    vLine.style.display = 'none';
+                    hLine.style.display = 'none';
+                }
+            });
+
+            container.addEventListener('mouseleave', () => {
+                vLine.style.display = 'none';
+                hLine.style.display = 'none';
+            });
         })();
         </script>
         """,
