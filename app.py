@@ -24,20 +24,13 @@ MARKET_START = "09:15"
 MARKET_END = "15:30"
 INTERVAL = 3
 
-# Hardcoded Access Token (hidden from UI)
 ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI6M0FZSEUiLCJqdGkiOiI6YThkNTc1Y2Y4MTJmNjA0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhapI1ZXJ2aWNlIiwiZXhwIjoxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU"
 
 MAJOR_INDICES = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50"]
 
 @st.cache_data(ttl=3600)
 def load_fno_symbols():
-    """
-    Reads symbol names from 'FNO ALL LIST.txt'.
-    Tries fetching from GitHub repository first, then checks local folder.
-    """
     symbols = []
-    
-    # 1. Try reading from GitHub raw link
     github_urls = [
         "https://raw.githubusercontent.com/meokgmblog/STRIKES-POSITION-BUILDER/main/FNO%20ALL%20LIST.txt",
         "https://raw.githubusercontent.com/meokgmblog/STRIKES-POSITION-BUILDER/main/FNO_ALL_LIST.txt",
@@ -55,7 +48,6 @@ def load_fno_symbols():
         except Exception:
             continue
 
-    # 2. Fallback to local .txt files if GitHub fetch fails
     if not symbols:
         possible_filenames = ["FNO ALL LIST.txt", "FNO_ALL_LIST.txt", "FNO all list.txt", "fno_all_list.txt"]
         for fname in possible_filenames:
@@ -69,16 +61,13 @@ def load_fno_symbols():
                 except Exception:
                     continue
 
-    # Clean and deduplicate combined list with major indices
-    all_symbols = sorted(list(set(MAJOR_INDICES + symbols)))
-    return all_symbols
+    return sorted(list(set(MAJOR_INDICES + symbols)))
 
 fno_symbol_list = load_fno_symbols()
 
 # Sidebar Controls
 st.sidebar.title("⚙️ Controls & Parameters")
 
-# Searchable Dropdown for F&O Symbols (Defaults to NIFTY)
 default_index = fno_symbol_list.index("NIFTY") if "NIFTY" in fno_symbol_list else 0
 SYMBOL_INPUT = st.sidebar.selectbox(
     "F&O Symbol",
@@ -117,7 +106,6 @@ def upstox_get(url, token, params=None):
 
 @st.cache_data(ttl=3600)
 def fetch_upstox_master_instruments():
-    """Downloads and caches the NSE instrument master file."""
     url = "https://assets.upstox.com/market-quote/instruments/exchange/NSE.csv.gz"
     try:
         res = requests.get(url, timeout=20)
@@ -133,9 +121,6 @@ def fetch_upstox_master_instruments():
         raise RuntimeError(f"Master file download error: {str(e)}")
 
 def resolve_stock_instruments(master_df, symbol):
-    """
-    Dynamically resolves Spot key, Futures key, and Option chains for stocks and indices.
-    """
     key_col = "instrument_key" if "instrument_key" in master_df.columns else "instrument_token"
     sym_col = "trading_symbol" if "trading_symbol" in master_df.columns else "tradingsymbol"
     type_col = "instrument_type" if "instrument_type" in master_df.columns else "segment"
@@ -144,7 +129,6 @@ def resolve_stock_instruments(master_df, symbol):
 
     clean_symbol = symbol.strip().upper()
 
-    # 1. Spot Key Resolution
     spot_mask = (
         (master_df[sym_col].astype(str).str.upper() == clean_symbol) |
         (master_df[sym_col].astype(str).str.upper() == f"{clean_symbol}-EQ") |
@@ -162,11 +146,10 @@ def resolve_stock_instruments(master_df, symbol):
         ]
 
     if spot_rows.empty:
-        raise RuntimeError(f"Could not find Equity Spot instrument for '{clean_symbol}'. Check symbol spelling or master mapping.")
+        raise RuntimeError(f"Could not find Equity Spot instrument for '{clean_symbol}'.")
 
     spot_key = spot_rows.iloc[0][key_col]
 
-    # 2. Options Resolution
     opts_mask = (
         (master_df[name_col].astype(str).str.upper() == clean_symbol) |
         (master_df[sym_col].astype(str).str.upper().str.startswith(clean_symbol))
@@ -190,7 +173,6 @@ def resolve_stock_instruments(master_df, symbol):
     return spot_key, matching_opts, key_col, sym_col, strike_col
 
 def get_intraday_candles(token, instrument_key):
-    """Fetches intraday 3-minute candles for any instrument key."""
     if not instrument_key:
         return pd.DataFrame()
 
@@ -266,19 +248,17 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# MERGED SINGLE-PANEL PLOTLY CHART RENDERER WITH FULL CROSSHAIR
+# SINGLE UNIFIED CROSSHAIR CHART RENDERER
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
     last_time = df["timestamp"].iloc[-1].strftime("%H:%M:%S")
 
-    # Enlarged Position Builder height ratio (~40% of total height)
-    # Both Candlestick and Histogram are linked in a unified subplot system
     fig = make_subplots(
         rows=2,
         cols=1,
         shared_xaxes=True,
-        vertical_spacing=0.04,
+        vertical_spacing=0.02,  # Minimized spacing so the vertical crosshair spans smoothly
         row_heights=[0.58, 0.42],  # Enlarged position builder panel
         subplot_titles=(
             f"{symbol} Spot | 3m | Last: {last_price:.2f} | Updated: {last_time} IST",
@@ -286,7 +266,7 @@ def render_chart(df, symbol, expiry_str):
         ),
     )
 
-    # 1. Candlestick Trace (Row 1)
+    # 1. Candlestick Trace
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -306,7 +286,7 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
-    # 2. Position Builder Histogram (Row 2 - Enlarged)
+    # 2. Position Builder Histogram (Enlarged Panel)
     values = df["position_builder_scaled"].fillna(0)
     colors = ["#089981" if v >= 0 else "#f23645" for v in values]
 
@@ -323,12 +303,11 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
-    # Combined Layout & Full Crosshair Config (Dual-Axis Horizontal & Vertical Lines)
     fig.update_layout(
         template="plotly_dark",
         paper_bgcolor="#131722",
         plot_bgcolor="#131722",
-        height=520,  # Increased overall chart height for better proportions
+        height=530,
         margin=dict(l=20, r=20, t=35, b=20),
         showlegend=False,
         hovermode="x unified",
@@ -336,24 +315,22 @@ def render_chart(df, symbol, expiry_str):
         xaxis_rangeslider_visible=False,
     )
 
-    # Synchronized Vertical & Horizontal Crosshairs on both axes
+    # Unified Full-Chart Vertical Crosshair
     fig.update_xaxes(
         showspikes=True,
-        spikemode="across",
-        spikesnap="cursor",
-        spikecolor="#89929e",
+        spikemode="across+marker",
+        spikecolor="#cccccc",
         spikethickness=1,
         spikedash="dash",
         gridcolor="#2a2e39",
         rangebreaks=[dict(bounds=["sat", "mon"])],
     )
 
-    # Horizontal Crosshair on Price Subplot
+    # Horizontal Crosshair - Price Subplot
     fig.update_yaxes(
         showspikes=True,
         spikemode="across",
-        spikesnap="cursor",
-        spikecolor="#89929e",
+        spikecolor="#cccccc",
         spikethickness=1,
         spikedash="dash",
         gridcolor="#2a2e39",
@@ -362,12 +339,11 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
-    # Horizontal Crosshair on Position Builder Subplot
+    # Horizontal Crosshair - Histogram Subplot
     fig.update_yaxes(
         showspikes=True,
         spikemode="across",
-        spikesnap="cursor",
-        spikecolor="#89929e",
+        spikecolor="#cccccc",
         spikethickness=1,
         spikedash="dash",
         range=[-110, 110],
@@ -393,18 +369,15 @@ try:
     with st.spinner("Downloading market metadata..."):
         master_df = fetch_upstox_master_instruments()
 
-    # Step 1: Dynamically resolve spot instrument & nearest options chain
     spot_key, opts_df, key_col, sym_col, strike_col = resolve_stock_instruments(master_df, SYMBOL_INPUT)
 
-    # Step 2: Get intraday spot candles
     spot_df = filter_market_hours(get_intraday_candles(ACCESS_TOKEN, spot_key))
     if spot_df.empty:
-        st.error(f"No intraday candle data returned for {SYMBOL_INPUT} spot. Market may be closed or token expired.")
+        st.error(f"No intraday candle data returned for {SYMBOL_INPUT} spot.")
         st.stop()
 
     last_close = spot_df["close"].iloc[-1]
 
-    # Step 3: Dynamic Strike & Step Detection
     opts_df["strike_num"] = pd.to_numeric(opts_df[strike_col], errors="coerce")
     unique_strikes = sorted(opts_df["strike_num"].dropna().unique())
 
@@ -414,12 +387,10 @@ try:
     else:
         step_size = 5.0
 
-    # Auto-calculate ATM Strike
     atm_strike = round(last_close / step_size) * step_size
     min_stk = atm_strike - (NUM_STRIKES_BOUND * step_size)
     max_stk = atm_strike + (NUM_STRIKES_BOUND * step_size)
 
-    # Filter ATM neighborhood options
     atm_opts = opts_df[(opts_df["strike_num"] >= min_stk) & (opts_df["strike_num"] <= max_stk)].copy()
     if atm_opts.empty:
         atm_opts = opts_df
@@ -427,7 +398,6 @@ try:
     ce_opts = atm_opts[atm_opts[sym_col].astype(str).str.endswith("CE")]
     pe_opts = atm_opts[atm_opts[sym_col].astype(str).str.endswith("PE")]
 
-    # Step 4: Fetch Call/Put Open Interest Data concurrently
     with st.spinner(f"Scouting {len(ce_opts) + len(pe_opts)} contracts around ATM ({atm_strike})..."):
         ce_df = fetch_option_data_parallel(ACCESS_TOKEN, ce_opts, key_col)
         pe_df = fetch_option_data_parallel(ACCESS_TOKEN, pe_opts, key_col)
@@ -436,11 +406,9 @@ try:
         ce_df = ce_df.rename(columns={"sum_oi": "ce_oi"}).sort_values("timestamp").ffill().dropna()
         pe_df = pe_df.rename(columns={"sum_oi": "pe_oi"}).sort_values("timestamp").ffill().dropna()
 
-        # Build position histogram
         builder_df = calculate_position_builder(spot_df, ce_df, pe_df)
         exp_date_str = opts_df.iloc[0]["expiry_dt"].strftime("%b-%d")
         
-        # Render dynamic chart
         render_chart(builder_df, SYMBOL_INPUT, f"Expiry: {exp_date_str}")
     else:
         st.error("Failed to fetch concurrent open interest data for strikes.")
@@ -449,7 +417,7 @@ except Exception as err:
     st.error(f"Execution Error: {str(err)}")
 
 # ================================================================
-# AUTO-REFRESH TRIGGER (SYNCED TO 3-MINUTE CANDLE BOUNDARIES)
+# AUTO-REFRESH TRIGGER
 # ================================================================
 now = datetime.now()
 seconds_past_3m = (now.minute % 3) * 60 + now.second
