@@ -253,26 +253,16 @@ def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
     last_time = df["timestamp"].iloc[-1].strftime("%H:%M:%S")
 
-    fig = go.Figure()
-
-    # 1. Position Builder Histogram Trace (Y2 Axis - Fixed at Bottom Pane)
-    values = df["position_builder_scaled"].fillna(0)
-    colors = ["#089981" if v >= 0 else "#f23645" for v in values]
-
-    fig.add_trace(
-        go.Bar(
-            x=df["timestamp"],
-            y=values,
-            name="Net OI Scaled",
-            marker_color=colors,
-            marker_line_width=0,
-            opacity=0.45,
-            yaxis="y2",
-            hovertemplate="Net OI Scaled: %{y:.1f}<extra></extra>",
-        )
+    # Create 2 stacked subplots with ZERO vertical spacing
+    fig = make_subplots(
+        rows=2,
+        cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0,
+        row_heights=[0.75, 0.25],
     )
 
-    # 2. Candlestick Price Trace (Y1 Axis)
+    # 1. Candlestick Price Trace (Top Subplot - Row 1)
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -286,9 +276,79 @@ def render_chart(df, symbol, expiry_str):
             decreasing_fillcolor="#f23645",
             decreasing_line_color="#f23645",
             whiskerwidth=0.4,
-            yaxis="y1",
             hovertemplate="Open: %{open:.2f}<br>High: %{high:.2f}<br>Low: %{low:.2f}<br>Close: %{close:.2f}<extra></extra>",
-        )
+        ),
+        row=1,
+        col=1,
+    )
+
+    # 2. Position Builder Histogram Trace (Bottom Subplot - Row 2)
+    values = df["position_builder_scaled"].fillna(0)
+    colors = ["#089981" if v >= 0 else "#f23645" for v in values]
+
+    fig.add_trace(
+        go.Bar(
+            x=df["timestamp"],
+            y=values,
+            name="Net OI Scaled",
+            marker_color=colors,
+            marker_line_width=0,
+            opacity=0.8,
+            hovertemplate="Net OI Scaled: %{y:.1f}<extra></extra>",
+        ),
+        row=2,
+        col=1,
+    )
+
+    # Global crosshair spike styling applied across both rows
+    spike_config = dict(
+        showspikes=True,
+        spikemode="across+toaxis",
+        spikesnap="cursor",
+        spikecolor="#ffffff",
+        spikethickness=1,
+        spikedash="dash",
+        gridcolor="#2a2e39",
+    )
+
+    # Configure X Axes (Shared crosshair line across top and bottom panels)
+    fig.update_xaxes(
+        **spike_config,
+        rangebreaks=[dict(bounds=["sat", "mon"])],
+        rangeslider=dict(visible=False),
+        matches="x",
+        row=1,
+        col=1,
+    )
+    
+    fig.update_xaxes(
+        **spike_config,
+        rangebreaks=[dict(bounds=["sat", "mon"])],
+        row=2,
+        col=1,
+    )
+
+    # Configure Y Axis - Top (Price)
+    fig.update_yaxes(
+        **spike_config,
+        side="right",
+        zerolinecolor="#363a45",
+        row=1,
+        col=1,
+    )
+
+    # Configure Y Axis - Bottom (Histogram Baseline)
+    fig.update_yaxes(
+        showspikes=False,
+        side="right",
+        range=[-120, 120],
+        showgrid=False,
+        showticklabels=False,
+        zeroline=True,
+        zerolinecolor="#363a45",
+        zerolinewidth=1,
+        row=2,
+        col=1,
     )
 
     fig.update_layout(
@@ -301,45 +361,11 @@ def render_chart(df, symbol, expiry_str):
         template="plotly_dark",
         paper_bgcolor="#131722",
         plot_bgcolor="#131722",
-        height=600,
+        height=620,
         margin=dict(l=20, r=20, t=45, b=20),
         showlegend=False,
         hovermode="x unified",
         dragmode="pan",
-        xaxis=dict(
-            type="date",
-            showspikes=True,
-            spikemode="across",
-            spikesnap="cursor",
-            spikecolor="#ffffff",
-            spikethickness=1,
-            spikedash="dash",
-            gridcolor="#2a2e39",
-            rangebreaks=[dict(bounds=["sat", "mon"])],
-            rangeslider=dict(visible=False),
-        ),
-        yaxis=dict(
-            title="Price",
-            showspikes=True,
-            spikemode="across",
-            spikesnap="cursor",
-            spikecolor="#ffffff",
-            spikethickness=1,
-            spikedash="dash",
-            gridcolor="#2a2e39",
-            side="right",
-        ),
-        # yaxis2 controls the bottom volume-style overlay region
-        yaxis2=dict(
-            title="",
-            overlaying="y",
-            side="left",
-            range=[-110, 420],  # Pushes the histogram down to occupy only ~25% of the bottom chart
-            showgrid=False,
-            showticklabels=False,  # Keeps price pane clean like TradingView
-            zeroline=True,
-            zerolinecolor="#363a45",
-        ),
     )
 
     config = {
