@@ -254,17 +254,9 @@ def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
     last_time = df["timestamp"].iloc[-1].strftime("%H:%M:%S")
 
-    # Calculate price extremes
-    price_min = df["low"].min()
-    price_max = df["high"].max()
-    price_span = price_max - price_min if price_max != price_min else 1.0
-
-    y1_min = price_min - (price_span * 0.05)
-    y1_max = price_max + (price_span * 0.05)
-
     fig = go.Figure()
 
-    # 1. Position Builder Histogram Trace (Bottom Y2 Axis)
+    # 1. Position Builder Histogram Trace (Assigned to Y2 Axis - Bottom Floor)
     values = df["position_builder_scaled"].fillna(0)
     colors = ["#089981" if v >= 0 else "#f23645" for v in values]
     formatted_times = df["timestamp"].dt.strftime("%B %d, %Y at %I:%M %p")
@@ -283,7 +275,7 @@ def render_chart(df, symbol, expiry_str):
         )
     )
 
-    # 2. Candlestick Price Trace (Top Y1 Axis)
+    # 2. Candlestick Price Trace (Assigned to Y1 Axis - Top Section)
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -317,7 +309,7 @@ def render_chart(df, symbol, expiry_str):
         showlegend=False,
         hovermode="x",
         dragmode="pan",
-        # Shared X-Axis Across Canvas
+        # Shared X-Axis with Crosshair Line
         xaxis=dict(
             type="date",
             showspikes=True,
@@ -330,12 +322,11 @@ def render_chart(df, symbol, expiry_str):
             rangebreaks=[dict(bounds=["sat", "mon"])],
             rangeslider=dict(visible=False),
         ),
-        # Primary Price Y-Axis (Isolated to Top 75% of Canvas)
+        # Primary Price Y-Axis (Top 75% Domain - Auto-scaling Enabled)
         yaxis=dict(
             title="Price",
-            domain=[0.22, 1.0],  # Restricts candles to top area
-            range=[y1_min, y1_max],
-            autorangelock="min-max",
+            domain=[0.25, 1.0],  # Keeps candles in top 75%
+            autorange=True,      # Enables smooth dynamic scaling on zoom
             showspikes=True,
             spikemode="across",
             spikesnap="cursor",
@@ -345,19 +336,16 @@ def render_chart(df, symbol, expiry_str):
             gridcolor="#2a2e39",
             side="right",
         ),
-        # Histogram Y-Axis (Locked to Bottom 20% of Canvas)
+        # Secondary Histogram Y-Axis (Bottom 22% Domain)
         yaxis2=dict(
             title="",
-            domain=[0.0, 0.18],  # Restricts histogram to bottom area
-            range=[-110, 110],   # Fixed scaling range for Net OI bars
-            fixedrange=True,     # Prevents autoscale/zoom from distorting bars
-            autorange=False,     # Locks axis during reset/autoscale button clicks
+            domain=[0.0, 0.22],  # Locks histogram to bottom 22%
+            side="right",
             showgrid=False,
             showticklabels=False,
             zeroline=True,
             zerolinecolor="#363a45",
             zerolinewidth=1,
-            side="left",
         ),
     )
 
