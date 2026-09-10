@@ -266,7 +266,7 @@ def render_chart(df, symbol, expiry_str):
         ),
     )
 
-    # 1. Candlestick Trace (Disabled hover text box)
+    # 1. Candlestick Trace
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -303,20 +303,18 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
-    # Crosshair Spike configuration on X-Axes (Spans top to bottom across both subplots)
+    # Synchronize and extend vertical crosshair across both subplots
     fig.update_xaxes(
         showspikes=True,
-        spikemode="across",
+        spikemode="across+toaxis",
         spikesnap="cursor",
         spikecolor="#ffffff",
         spikethickness=1,
         spikedash="dash",
         gridcolor="#2a2e39",
         rangebreaks=[dict(bounds=["sat", "mon"])],
+        matches="x",
     )
-
-    # Synchronize X-axis panning and zooming between top and bottom plots
-    fig.update_xaxes(matches="x", row=2, col=1)
 
     # Horizontal Crosshair - Price Subplot
     fig.update_yaxes(
@@ -354,7 +352,7 @@ def render_chart(df, symbol, expiry_str):
         height=530,
         margin=dict(l=20, r=20, t=35, b=20),
         showlegend=False,
-        hovermode="x",  # Ensures vertical spike triggers across both subplots
+        hovermode="x unified",  # Unified hover mode anchors vertical crosshair across all subplots
         dragmode="pan",
         xaxis_rangeslider_visible=False,
     )
