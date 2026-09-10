@@ -303,41 +303,29 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
-    # Synchronize X-axis panning/zooming
-    fig.update_xaxes(matches="x")
-
-    # Configure top and bottom vertical crosshair spikes to span across subplots
-    fig.update_layout(
-        xaxis=dict(
-            showspikes=True,
-            spikemode="across",
-            spikesnap="cursor",
-            spikecolor="#ffffff",
-            spikethickness=1,
-            spikedash="dash",
-            gridcolor="#2a2e39",
-            rangebreaks=[dict(bounds=["sat", "mon"])],
-        ),
-        xaxis2=dict(
-            showspikes=True,
-            spikemode="across",
-            spikesnap="cursor",
-            spikecolor="#ffffff",
-            spikethickness=1,
-            spikedash="dash",
-            gridcolor="#2a2e39",
-            rangebreaks=[dict(bounds=["sat", "mon"])],
-        ),
+    # Crosshair Spike configuration on X-Axes
+    fig.update_xaxes(
+        showspikes=True,
+        spikemode="across+toaxis",
+        spikesnap="cursor",
+        spikecolor="#ffffff",
+        spikethickness=1,
+        spikedash="dash",
+        spikedistance=-1,  # Forces spike evaluation across full chart canvas width/height
+        gridcolor="#2a2e39",
+        rangebreaks=[dict(bounds=["sat", "mon"])],
+        matches="x",
     )
 
     # Horizontal Crosshair - Price Subplot
     fig.update_yaxes(
         showspikes=True,
-        spikemode="across",
+        spikemode="across+toaxis",
         spikesnap="cursor",
         spikecolor="#ffffff",
         spikethickness=1,
         spikedash="dash",
+        spikedistance=-1,
         gridcolor="#2a2e39",
         zerolinecolor="#363a45",
         row=1,
@@ -347,11 +335,12 @@ def render_chart(df, symbol, expiry_str):
     # Horizontal Crosshair - Position Builder Subplot
     fig.update_yaxes(
         showspikes=True,
-        spikemode="across",
+        spikemode="across+toaxis",
         spikesnap="cursor",
         spikecolor="#ffffff",
         spikethickness=1,
         spikedash="dash",
+        spikedistance=-1,
         range=[-110, 110],
         gridcolor="#2a2e39",
         zerolinecolor="#363a45",
@@ -367,6 +356,8 @@ def render_chart(df, symbol, expiry_str):
         margin=dict(l=20, r=20, t=35, b=20),
         showlegend=False,
         hovermode="x",
+        hoverdistance=-1,
+        spikedistance=-1,
         dragmode="pan",
         xaxis_rangeslider_visible=False,
     )
@@ -379,6 +370,26 @@ def render_chart(df, symbol, expiry_str):
     }
 
     st.plotly_chart(fig, use_container_width=True, config=config)
+
+    # CSS Injection to allow spike lines to overflow subplot container boundary boxes
+    st.markdown(
+        """
+        <style>
+        .js-plotly-plot .plotly .spikeline {
+            stroke-dasharray: 3px, 3px !important;
+            stroke: #ffffff !important;
+            stroke-width: 1px !important;
+        }
+        .js-plotly-plot .plotly .subplot {
+            overflow: visible !important;
+        }
+        .js-plotly-plot .plotly .cartesianlayer {
+            overflow: visible !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 # ================================================================
 # MAIN EXECUTION ENGINE
