@@ -248,7 +248,7 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# CHART RENDERER (TRADINGVIEW-STYLE NATIVE CROSSHAIR)
+# CHART RENDERER (TRADINGVIEW STYLE CROSSHAIR)
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
@@ -258,15 +258,15 @@ def render_chart(df, symbol, expiry_str):
         rows=2,
         cols=1,
         shared_xaxes=True,
-        vertical_spacing=0.02,
-        row_heights=[0.60, 0.40],
+        vertical_spacing=0.03,
+        row_heights=[0.58, 0.42],
         subplot_titles=(
             f"{symbol} Spot | 3m | Last: {last_price:.2f} | Updated: {last_time} IST",
             f"POSITION BUILDER HISTOGRAM ({expiry_str})",
         ),
     )
 
-    # 1. Candlestick Trace (hovertemplate empty removes OHLC info card completely)
+    # 1. Candlestick Trace (Disabled hover text box)
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -280,7 +280,7 @@ def render_chart(df, symbol, expiry_str):
             decreasing_fillcolor="#f23645",
             decreasing_line_color="#f23645",
             whiskerwidth=0.4,
-            hovertemplate="",
+            hovertemplate="<extra></extra>",
         ),
         row=1,
         col=1,
@@ -297,13 +297,13 @@ def render_chart(df, symbol, expiry_str):
             name="Net OI Scaled",
             marker_color=colors,
             marker_line_width=0,
-            hovertemplate="",
+            hovertemplate="<extra></extra>",
         ),
         row=2,
         col=1,
     )
 
-    # Enable native spikes on both x-axes with cursor snapping
+    # Crosshair Spike configuration on X-Axes (Spans top to bottom across both subplots)
     fig.update_xaxes(
         showspikes=True,
         spikemode="across",
@@ -315,7 +315,10 @@ def render_chart(df, symbol, expiry_str):
         rangebreaks=[dict(bounds=["sat", "mon"])],
     )
 
-    # Enable horizontal spikes on both y-axes
+    # Synchronize X-axis panning and zooming between top and bottom plots
+    fig.update_xaxes(matches="x", row=2, col=1)
+
+    # Horizontal Crosshair - Price Subplot
     fig.update_yaxes(
         showspikes=True,
         spikemode="across",
@@ -329,6 +332,7 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
+    # Horizontal Crosshair - Position Builder Subplot
     fig.update_yaxes(
         showspikes=True,
         spikemode="across",
@@ -350,9 +354,7 @@ def render_chart(df, symbol, expiry_str):
         height=530,
         margin=dict(l=20, r=20, t=35, b=20),
         showlegend=False,
-        hovermode="x",
-        hoverdistance=100,
-        spikedistance=1000,
+        hovermode="x",  # Ensures vertical spike triggers across both subplots
         dragmode="pan",
         xaxis_rangeslider_visible=False,
     )
