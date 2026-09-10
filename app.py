@@ -23,15 +23,33 @@ MARKET_START = "09:15"
 MARKET_END = "15:30"
 INTERVAL = 3
 
+# Hardcoded Access Token (hidden from UI)
+ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI6M0FZSEUiLCJqdGkiOiI6YThkNTc1Y2Y4MTJmNjA0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU"
+
+@st.cache_data(ttl=3600)
+def load_fno_symbols():
+    """Reads symbol names from the FNO excel list file."""
+    try:
+        fno_df = pd.read_excel("FNO all list.xlsx")
+        symbols = fno_df["SYMBOL"].dropna().astype(str).str.strip().str.upper().unique().tolist()
+        return sorted(symbols)
+    except Exception:
+        # Fallback list if file is inaccessible
+        return ["LAURUSLABS", "NIFTY", "BANKNIFTY"]
+
+fno_symbol_list = load_fno_symbols()
+
 # Sidebar Controls
 st.sidebar.title("⚙️ Controls & Parameters")
-ACCESS_TOKEN = st.sidebar.text_input(
-    "Upstox Access Token",
-    value="eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI6M0FZSEUiLCJqdGkiOiI6YThkNTc1Y2Y4MTJmNjA0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU",
-    type="password"
-)
 
-SYMBOL_INPUT = st.sidebar.text_input("F&O Symbol", value="LAURUSLABS").strip().upper()
+# Searchable Dropdown for F&O Symbols
+default_index = fno_symbol_list.index("LAURUSLABS") if "LAURUSLABS" in fno_symbol_list else 0
+SYMBOL_INPUT = st.sidebar.selectbox(
+    "F&O Symbol",
+    options=fno_symbol_list,
+    index=default_index
+).strip().upper()
+
 NUM_STRIKES_BOUND = st.sidebar.slider("Strikes Range (± ATM)", min_value=2, max_value=12, value=2)
 
 st.title(f"📈 {SYMBOL_INPUT} - Live 3-Minute Position Builder")
@@ -269,12 +287,12 @@ def render_chart(df, symbol, expiry_str):
         col=1,
     )
 
-    # Crosshair & Layout setup
+    # Crosshair & Layout setup (Height scaled down to 420px)
     fig.update_layout(
         template="plotly_dark",
         paper_bgcolor="#131722",
         plot_bgcolor="#131722",
-        height=720,
+        height=420,
         margin=dict(l=15, r=15, t=35, b=15),
         showlegend=False,
         hovermode="x unified",
