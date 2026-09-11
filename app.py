@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots  # <--- Added missing import
+from plotly.subplots import make_subplots
 import requests
 import streamlit as st
 
@@ -105,15 +105,32 @@ def upstox_get(url, token, params=None):
 
 @st.cache_data(ttl=3600)
 def fetch_upstox_master_instruments():
-    url = "https://assets.upstox.com/market-quote/instruments/exchange/NSE.csv.gz"
+    nse_url = "https://assets.upstox.com/market-quote/instruments/exchange/NSE.csv.gz"
+    bse_url = "https://assets.upstox.com/market-quote/instruments/exchange/BSE.csv.gz"
     try:
-        res = requests.get(url, timeout=20)
-        if res.status_code != 200:
-            raise Exception(f"HTTP {res.status_code} while fetching master csv.")
+        df_nse = pd.DataFrame()
+        df_bse = pd.DataFrame()
 
-        with gzip.open(io.BytesIO(res.content), "rt") as f:
-            df = pd.read_csv(f)
+        try:
+            res_nse = requests.get(nse_url, timeout=20)
+            if res_nse.status_code == 200:
+                with gzip.open(io.BytesIO(res_nse.content), "rt") as f:
+                    df_nse = pd.read_csv(f)
+        except Exception:
+            pass
 
+        try:
+            res_bse = requests.get(bse_url, timeout=20)
+            if res_bse.status_code == 200:
+                with gzip.open(io.BytesIO(res_bse.content), "rt") as f:
+                    df_bse = pd.read_csv(f)
+        except Exception:
+            pass
+
+        if df_nse.empty and df_bse.empty:
+            raise Exception("Failed to fetch master csv files for NSE and BSE.")
+
+        df = pd.concat([df_nse, df_bse], ignore_index=True)
         df.columns = [c.lower() for c in df.columns]
         return df
     except Exception as e:
@@ -133,7 +150,7 @@ def resolve_stock_instruments(master_df, symbol):
         (master_df[sym_col].astype(str).str.upper() == f"{clean_symbol}-EQ") |
         (master_df[name_col].astype(str).str.upper() == clean_symbol)
     ) & (
-        master_df[type_col].astype(str).str.upper().str.contains("EQ|EQUITY|INDEX|NSE_EQ", regex=True)
+        master_df[type_col].astype(str).str.upper().str.contains("EQ|EQUITY|INDEX|NSE_EQ|BSE_INDEX", regex=True)
     )
 
     spot_rows = master_df[spot_mask]
@@ -141,7 +158,7 @@ def resolve_stock_instruments(master_df, symbol):
     if spot_rows.empty:
         spot_rows = master_df[
             master_df[sym_col].astype(str).str.upper().str.startswith(clean_symbol) &
-            master_df[type_col].astype(str).str.upper().str.contains("EQ|EQUITY|INDEX|NSE_EQ", regex=True)
+            master_df[type_col].astype(str).str.upper().str.contains("EQ|EQUITY|INDEX|NSE_EQ|BSE_INDEX", regex=True)
         ]
 
     if spot_rows.empty:
