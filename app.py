@@ -436,13 +436,14 @@ except Exception as err:
 # ================================================================
 now = datetime.now()
 seconds_past_3m = (now.minute % 3) * 60 + now.second
-ms_until_candle_close = max((180 - seconds_past_3m + 2) * 1000, 3000)
+seconds_to_wait = 180 - (seconds_past_3m % 180)
+ms_until_candle_close = max((seconds_to_wait + 3) * 1000, 3000)
 
 components.html(
     f"""
     <script>
         setTimeout(function() {{
-            window.parent.postMessage({{type: 'streamlit:render'}}, '*');
+            window.parent.location.reload();
         }}, {ms_until_candle_close});
     </script>
     """,
