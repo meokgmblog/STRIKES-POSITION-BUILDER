@@ -12,7 +12,6 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots  # <--- Added missing import
 import requests
 import streamlit as st
-import streamlit.components.v1 as components
 
 # ================================================================
 # CONFIGURATION & PAGE SETUP
@@ -378,59 +377,68 @@ def render_chart(df, symbol, expiry_str):
     st.plotly_chart(fig, use_container_width=True, config=config)
 
 # ================================================================
-# MAIN EXECUTION ENGINE (SILENT AUTO-UPDATE VIA FRAGMENT)
+# MAIN EXECUTION ENGINE
 # ================================================================
-@st.fragment(run_every=180)
-def run_live_builder_engine():
-    try:
-        with st.spinner("Downloading market metadata..."):
-            master_df = fetch_upstox_master_instruments()
+try:
+    with st.spinner("Downloading market metadata..."):
+        master_df = fetch_upstox_master_instruments()
 
-        spot_key, opts_df, key_col, sym_col, strike_col = resolve_stock_instruments(master_df, SYMBOL_INPUT)
+    spot_key, opts_df, key_col, sym_col, strike_col = resolve_stock_instruments(master_df, SYMBOL_INPUT)
 
-        spot_df = filter_market_hours(get_intraday_candles(ACCESS_TOKEN, spot_key))
-        if spot_df.empty:
-            st.error(f"No intraday candle data returned for {SYMBOL_INPUT} spot.")
-            return
+    spot_df = filter_market_hours(get_intraday_candles(ACCESS_TOKEN, spot_key))
+    if spot_df.empty:
+        st.error(f"No intraday candle data returned for {SYMBOL_INPUT} spot.")
+        st.stop()
 
-        last_close = spot_df["close"].iloc[-1]
+    last_close = spot_df["close"].iloc[-1]
 
-        opts_df["strike_num"] = pd.to_numeric(opts_df[strike_col], errors="coerce")
-        unique_strikes = sorted(opts_df["strike_num"].dropna().unique())
+    opts_df["strike_num"] = pd.to_numeric(opts_df[strike_col], errors="coerce")
+    unique_strikes = sorted(opts_df["strike_num"].dropna().unique())
 
-        if len(unique_strikes) > 1:
-            strike_diffs = np.diff(unique_strikes)
-            step_size = float(np.median(strike_diffs))
-        else:
-            step_size = 5.0
+    if len(unique_strikes) > 1:
+        strike_diffs = np.diff(unique_strikes)
+        step_size = float(np.median(strike_diffs))
+    else:
+        step_size = 5.0
 
-        atm_strike = round(last_close / step_size) * step_size
-        min_stk = atm_strike - (NUM_STRIKES_BOUND * step_size)
-        max_stk = atm_strike + (NUM_STRIKES_BOUND * step_size)
+    atm_strike = round(last_close / step_size) * step_size
+    min_stk = atm_strike - (NUM_STRIKES_BOUND * step_size)
+    max_stk = atm_strike + (NUM_STRIKES_BOUND * step_size)
 
-        atm_opts = opts_df[(opts_df["strike_num"] >= min_stk) & (opts_df["strike_num"] <= max_stk)].copy()
-        if atm_opts.empty:
-            atm_opts = opts_df
+    atm_opts = opts_df[(opts_df["strike_num"] >= min_stk) & (opts_df["strike_num"] <= max_stk)].copy()
+    if atm_opts.empty:
+        atm_opts = opts_df
 
-        ce_opts = atm_opts[atm_opts[sym_col].astype(str).str.endswith("CE")]
-        pe_opts = atm_opts[atm_opts[sym_col].astype(str).str.endswith("PE")]
+    ce_opts = atm_opts[atm_opts[sym_col].astype(str).str.endswith("CE")]
+    pe_opts = atm_opts[atm_opts[sym_col].astype(str).str.endswith("PE")]
 
-        with st.spinner(f"Scouting {len(ce_opts) + len(pe_opts)} contracts around ATM ({atm_strike})..."):
-            ce_df = fetch_option_data_parallel(ACCESS_TOKEN, ce_opts, key_col)
-            pe_df = fetch_option_data_parallel(ACCESS_TOKEN, pe_opts, key_col)
+    with st.spinner(f"Scouting {len(ce_opts) + len(pe_opts)} contracts around ATM ({atm_strike})..."):
+        ce_df = fetch_option_data_parallel(ACCESS_TOKEN, ce_opts, key_col)
+        pe_df = fetch_option_data_parallel(ACCESS_TOKEN, pe_opts, key_col)
 
-        if ce_df is not None and pe_df is not None:
-            ce_df = ce_df.rename(columns={"sum_oi": "ce_oi"}).sort_values("timestamp").ffill().dropna()
-            pe_df = pe_df.rename(columns={"sum_oi": "pe_oi"}).sort_values("timestamp").ffill().dropna()
+    if ce_df is not None and pe_df is not None:
+        ce_df = ce_df.rename(columns={"sum_oi": "ce_oi"}).sort_values("timestamp").ffill().dropna()
+        pe_df = pe_df.rename(columns={"sum_oi": "pe_oi"}).sort_values("timestamp").ffill().dropna()
 
-            builder_df = calculate_position_builder(spot_df, ce_df, pe_df)
-            exp_date_str = opts_df.iloc[0]["expiry_dt"].strftime("%b-%d")
-            
-            render_chart(builder_df, SYMBOL_INPUT, f"Expiry: {exp_date_str}")
-        else:
-            st.error("Failed to fetch concurrent open interest data for strikes.")
+        builder_df = calculate_position_builder(spot_df, ce_df, pe_df)
+        exp_date_str = opts_df.iloc[0]["expiry_dt"].strftime("%b-%d")
+        
+        render_chart(builder_df, SYMBOL_INPUT, f"Expiry: {exp_date_str}")
+    else:
+        st.error("Failed to fetch concurrent open interest data for strikes.")
 
-    except Exception as err:
-        st.error(f"Execution Error: {str(err)}")
+except Exception as err:
+    st.error(f"Execution Error: {str(err)}")
 
-run_live_builder_engine()
+# ================================================================
+# AUTO-REFRESH TRIGGER (Silent Clock-Aligned Rerun)
+# ================================================================
+now = datetime.now(IST)
+total_seconds = now.hour * 3600 + now.minute * 60 + now.second
+market_start_seconds = 9 * 3600 + 15 * 60
+remainder = (total_seconds - market_start_seconds) % 180
+seconds_to_wait = 180 - remainder if remainder != 0 else 180
+sleep_time = seconds_to_wait + 3
+
+time.sleep(sleep_time)
+st.rerun()
