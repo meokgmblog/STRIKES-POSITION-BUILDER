@@ -262,6 +262,13 @@ def render_chart(df, symbol, expiry_str):
     y1_min = price_min - (price_span * 0.35)
     y1_max = price_max + (price_span * 0.05)
 
+    # Fixed intraday range from 09:15 to 15:30 for the current session date
+    current_date = df["timestamp"].dt.date.iloc[-1]
+    xaxis_range = [
+        pd.Timestamp(f"{current_date} {MARKET_START}:00"),
+        pd.Timestamp(f"{current_date} {MARKET_END}:00")
+    ]
+
     fig = go.Figure()
 
     # 1. Position Builder Histogram Trace (Y2 Axis - Shifted to Bottom)
@@ -319,9 +326,10 @@ def render_chart(df, symbol, expiry_str):
         showlegend=False,
         hovermode="x",
         dragmode="pan",
-        # Unified X-Axis placed at the bottom below histogram
+        # Unified X-Axis placed at the bottom below histogram with fixed session range
         xaxis=dict(
             type="date",
+            range=xaxis_range,
             side="bottom",  # Forces time labels to the very bottom
             showspikes=True,
             spikemode="across",
