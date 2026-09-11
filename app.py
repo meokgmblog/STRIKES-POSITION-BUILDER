@@ -19,8 +19,8 @@ import streamlit as st
 st.set_page_config(page_title="F&O Live Position Builder", layout="wide")
 
 IST = ZoneInfo("Asia/Kolkata")
-MARKET_START = "09:15"
-MARKET_END = "15:30"
+MARKET_START = "09:00"
+MARKET_END = "15:45"
 INTERVAL = 3
 
 ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI6M0FZSEUiLCJqdGkiOiI6YThkNTc1Y2Y4MTJmZmQ0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhapI1ZXJ2aWNlIiwiZXhwIjoxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU"
@@ -261,7 +261,7 @@ def render_chart(df, symbol, expiry_str):
     y1_min = price_min - (price_span * 0.35)
     y1_max = price_max + (price_span * 0.05)
 
-    # Fixed intraday range from 09:15 to 15:30 for the current session date
+    # Fixed intraday range from 09:00 to 15:45 for the current session date
     current_date = df["timestamp"].dt.date.iloc[-1]
     xaxis_range = [
         pd.Timestamp(f"{current_date} {MARKET_START}:00"),
@@ -434,11 +434,16 @@ except Exception as err:
 # AUTO-REFRESH TRIGGER (Silent Clock-Aligned Rerun)
 # ================================================================
 now = datetime.now(IST)
-total_seconds = now.hour * 3600 + now.minute * 60 + now.second
-market_start_seconds = 9 * 3600 + 15 * 60
-remainder = (total_seconds - market_start_seconds) % 180
-seconds_to_wait = 180 - remainder if remainder != 0 else 180
-sleep_time = seconds_to_wait + 3
+market_end_time = datetime.strptime(MARKET_END, "%H:%M").time()
 
-time.sleep(sleep_time)
-st.rerun()
+if now.time() >= market_end_time:
+    st.info("🔒 Market hours ended (Frozen after 3:45 PM). Data and chart are locked for the session.")
+else:
+    total_seconds = now.hour * 3600 + now.minute * 60 + now.second
+    market_start_seconds = 9 * 3600 + 0 * 60
+    remainder = (total_seconds - market_start_seconds) % 180
+    seconds_to_wait = 180 - remainder if remainder != 0 else 180
+    sleep_time = seconds_to_wait + 3
+
+    time.sleep(sleep_time)
+    st.rerun()
