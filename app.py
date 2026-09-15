@@ -74,7 +74,7 @@ SYMBOL_INPUT = st.sidebar.selectbox(
     index=default_index
 ).strip().upper()
 
-NUM_STRIKES_BOUND = st.sidebar.slider("Strikes Range (± ATM)", min_value=2, max_value=18, value=2)
+NUM_STRIKES_BOUND = st.sidebar.slider("Strikes Range (± ATM)", min_value=2, max_value=12, value=2)
 
 st.title(f"📈 {SYMBOL_INPUT} - Live 3-Minute Position Builder")
 
