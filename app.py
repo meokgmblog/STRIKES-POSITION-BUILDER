@@ -302,7 +302,7 @@ def render_chart(df, symbol, expiry_str):
             name="Net OI Scaled",
             marker_color=colors,
             marker_line_width=0,
-            opacity=0.8,
+            opacity=0.7,
             yaxis="y2",
             hovertemplate="%{customdata}<extra></extra>",  # Shows ONLY the Date and Time
         )
